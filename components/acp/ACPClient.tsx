@@ -207,23 +207,18 @@ export default function ACPClient() {
     const formData = new FormData()
     formData.append('file', file)
 
-    const res = await fetch('/api/ocr/route', {
+    const res = await fetch('/api/ocr', {
       method: 'POST',
       body: formData,
     })
 
+    const data = await res.json()
+
     if (!res.ok) {
-      // Fallback: try the base OCR endpoint
-      const res2 = await fetch('/api/ocr', {
-        method: 'POST',
-        body: formData,
-      })
-      if (!res2.ok) throw new Error('OCR failed')
-      const data2 = await res2.json()
-      return data2.text ?? ''
+      const detail = data?.details ?? data?.error ?? 'OCR failed'
+      throw new Error(detail)
     }
 
-    const data = await res.json()
     return data.text ?? ''
   }
 
