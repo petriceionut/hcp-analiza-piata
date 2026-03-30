@@ -43,27 +43,46 @@ export default function StepClientData({ data, onUpdate, onNext, onBack }: Props
 
       const text: string = data.text ?? ''
 
-      // Parse raw OCR text for Romanian ID card fields
+      // Parse raw OCR text for Romanian ID card fields.
+      //
+      // Romanian ID cards use multilingual labels on ONE line, value on the NEXT:
+      //   Prenume/Prénom/Given names\nION GHEORGHE
+      //   Nume/Nom/Surname\nPOPESCU
+      //   Domiciliu/Adresse/Address\nSTR. FLORILOR NR. 5, SECTOR 3
+      //
+      // Pattern: match the Romanian keyword, skip rest of label line with [^\n]*,
+      // then capture the value on the following line.
+
       const cnpMatch = text.match(/\b([1256]\d{12})\b/)
       if (cnpMatch) setValue('cnp', cnpMatch[1])
 
+      // Series: "Seria/Série/Series IF Nr./No. 123456" — all on one line
       const serieMatch =
-        text.match(/(?:SERIA|Seria)\s+([A-Z]{2})\s+(?:NR\.?|Nr\.?)?\s*(\d{6})/i) ||
+        text.match(/(?:Seria|S[eé]rie|Series)[^\n]*?\b([A-Z]{2})\b[^\n]*?\b(\d{6})\b/i) ||
         text.match(/\b([A-Z]{2})\s+(\d{6})\b/)
       if (serieMatch) {
         setValue('serie_buletin', serieMatch[1])
         setValue('nr_buletin', serieMatch[2])
       }
 
-      const numeMatch = text.match(/(?:Nume|NUME)[\/|]?(?:Name|NAME)?\s*\n?\s*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ\s-]{1,30})/m)
+      // Surname: label line contains "Nume" → skip to next line for value
+      const numeMatch = text.match(/(?:Nume|Nom|Surname)[^\n]*\n[ \t]*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ\s-]{1,30})/im)
       if (numeMatch) setValue('nume', numeMatch[1].trim())
 
-      const prenumeMatch = text.match(/(?:Prenume|PRENUME)[\/|]?(?:Given names?|GIVEN NAMES?)?\s*\n?\s*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ\s-]{1,40})/m)
+      // Given name: label line contains "Prenume" → skip to next line for value
+      const prenumeMatch = text.match(/(?:Prenume|Pr[eé]nom|Given\s+names?)[^\n]*\n[ \t]*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ\s-]{1,40})/im)
       if (prenumeMatch) setValue('prenume', prenumeMatch[1].trim())
 
-      const adresaMatch =
-        text.match(/(?:Adresa|ADRESA|Adresă|Domiciliu|DOMICILIU)\s*\n?\s*([^\n]{10,80})/im)
-      if (adresaMatch) setValue('adresa_domiciliu', adresaMatch[1].trim())
+      // Address: label line contains "Domiciliu" → skip to next line for value
+      // Address can span two lines (street on one, city on next); take both joined
+      const adresaMatch = text.match(/(?:Domiciliu|Adress[e]?|Address)[^\n]*\n[ \t]*([^\n]{5,80})(?:\n[ \t]*([^\n]{5,60}))?/im)
+      if (adresaMatch) {
+        const line1 = adresaMatch[1].trim()
+        const line2 = adresaMatch[2]?.trim()
+        // Only append second line if it looks like a continuation (starts with city/sector/jud)
+        const isSecondLineContinuation = line2 && /^(?:SECTOR|JUD|JUDEȚUL|MUNICIPIUL|ORAȘ|COMUNA|SAT|\d)/i.test(line2)
+        setValue('adresa_domiciliu', isSecondLineContinuation ? `${line1}, ${line2}` : line1)
+      }
 
       const fieldsFound = [cnpMatch, serieMatch, numeMatch, prenumeMatch, adresaMatch].filter(Boolean).length
       if (fieldsFound > 0) {

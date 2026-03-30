@@ -27,31 +27,31 @@ function parseIDText(text: string): ExtractedIDData {
   const cnpMatch = text.match(/\b([1256]\d{12})\b/)
   if (cnpMatch) result.cnp = cnpMatch[1]
 
-  // Series (2 uppercase letters) followed by number (6 digits)
+  // Series: "Seria/Série/Series IF Nr./No. 123456" — all on one line
   const serieMatch =
-    text.match(/(?:SERIA|Seria|seria)\s+([A-Z]{2})\s+(?:NR\.?|Nr\.?|nr\.?)?\s*(\d{6})/i) ||
+    text.match(/(?:Seria|S[eé]rie|Series)[^\n]*?\b([A-Z]{2})\b[^\n]*?\b(\d{6})\b/i) ||
     text.match(/\b([A-Z]{2})\s+(\d{6})\b/)
   if (serieMatch) {
     result.serie_buletin = serieMatch[1]
     result.nr_buletin = serieMatch[2]
   }
 
-  // Name extraction – Romanian ID cards list surname then given names
-  const numeMatch =
-    text.match(/(?:Nume|NUME|Nom|NOM)[\/|]?(?:Name|NAME)?\s*\n?\s*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ\s-]{1,30})/m) ||
-    text.match(/(?:Last name|Cognome)\s*\n?\s*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ\s-]{1,30})/im)
+  // Surname: label line "Nume/Nom/Surname" → skip rest of line → value on next line
+  const numeMatch = text.match(/(?:Nume|Nom|Surname)[^\n]*\n[ \t]*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ\s-]{1,30})/im)
   if (numeMatch) result.nume = numeMatch[1].trim()
 
-  const prenumeMatch =
-    text.match(/(?:Prenume|PRENUME|Prénoms?|PRENOM)[\/|]?(?:Given names?|GIVEN NAMES?)?\s*\n?\s*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ\s-]{1,40})/m) ||
-    text.match(/(?:First name|Nome)\s*\n?\s*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ\s-]{1,40})/im)
+  // Given name: label line "Prenume/Prénom/Given names" → skip → value on next line
+  const prenumeMatch = text.match(/(?:Prenume|Pr[eé]nom|Given\s+names?)[^\n]*\n[ \t]*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ\s-]{1,40})/im)
   if (prenumeMatch) result.prenume = prenumeMatch[1].trim()
 
-  // Address
-  const adresaMatch =
-    text.match(/(?:Adresa|ADRESA|Adresă|Address)\s*\n?\s*([^\n]{10,80})/im) ||
-    text.match(/(?:Domiciliu|DOMICILIU)\s*\n?\s*([^\n]{10,80})/im)
-  if (adresaMatch) result.adresa_domiciliu = adresaMatch[1].trim()
+  // Address: label line "Domiciliu/Adresse/Address" → skip → value on next line(s)
+  const adresaMatch = text.match(/(?:Domiciliu|Adress[e]?|Address)[^\n]*\n[ \t]*([^\n]{5,80})(?:\n[ \t]*([^\n]{5,60}))?/im)
+  if (adresaMatch) {
+    const line1 = adresaMatch[1].trim()
+    const line2 = adresaMatch[2]?.trim()
+    const isSecondLineContinuation = line2 && /^(?:SECTOR|JUD|JUDEȚUL|MUNICIPIUL|ORAȘ|COMUNA|SAT|\d)/i.test(line2)
+    result.adresa_domiciliu = isSecondLineContinuation ? `${line1}, ${line2}` : line1
+  }
 
   return result
 }
