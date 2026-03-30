@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
     }
 
     const bytes = await file.arrayBuffer();
-    const base64 = Buffer.from(new Uint8Array(bytes)).toString('base64');
+    const base64 = Buffer.from(bytes).toString('base64');
 
     const credentials = JSON.parse(process.env.GOOGLE_VISION_CREDENTIALS || '{}');
     const jwt = await createJWT(credentials);
@@ -69,9 +69,11 @@ async function createJWT(credentials: Record<string, string>): Promise<string> {
 
   const signingInput = `${encode(header)}.${encode(payload)}`;
 
+  const keyBuffer = pemToBuffer(credentials.private_key);
+
   const privateKey = await crypto.subtle.importKey(
     'pkcs8',
-    pemToBuffer(credentials.private_key),
+    keyBuffer,
     { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
     false,
     ['sign']
@@ -83,13 +85,18 @@ async function createJWT(credentials: Record<string, string>): Promise<string> {
     new TextEncoder().encode(signingInput)
   );
 
-  return `${signingInput}.${Buffer.from(new Uint8Array(signature)).toString('base64url')}`;
+  return `${signingInput}.${Buffer.from(signature).toString('base64url')}`;
 }
 
-function pemToBuffer(pem: string): Uint8Array {
+function pemToBuffer(pem: string): ArrayBuffer {
   const base64 = pem
-    .replace(/-----BEGIN PRIVATE KEY-----/, '')
-    .replace(/-----END PRIVATE KEY-----/, '')
-    .replace(/\n/g, '');
-  return new Uint8Array(Buffer.from(base64, 'base64'));
+    .replace(/-----BEGIN PRIVATE KEY-----/g, '')
+    .replace(/-----END PRIVATE KEY-----/g, '')
+    .replace(/\s/g, '');
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer;
 }
