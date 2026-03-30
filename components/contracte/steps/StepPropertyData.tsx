@@ -45,23 +45,48 @@ export default function StepPropertyData({ data, onUpdate, onNext, onBack }: Pro
       const formData = new FormData()
       formData.append('file', file)
 
-      const res = await fetch('/api/ocr/extras-cf', {
+      const res = await fetch('/api/ocr', {
         method: 'POST',
         body: formData,
       })
 
-      if (!res.ok) throw new Error('OCR failed')
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.details ?? data?.error ?? 'OCR failed')
 
-      const extracted = await res.json()
+      const text: string = data.text ?? ''
 
-      if (extracted.adresa) setValue('adresa', extracted.adresa)
-      if (extracted.suprafata_construita) setValue('suprafata_construita', extracted.suprafata_construita)
-      if (extracted.suprafata_utila) setValue('suprafata_utila', extracted.suprafata_utila)
-      if (extracted.suprafata_teren) setValue('suprafata_teren', extracted.suprafata_teren)
-      if (extracted.nr_cadastral) setValue('nr_cadastral', extracted.nr_cadastral)
-      if (extracted.nr_carte_funciara) setValue('nr_carte_funciara', extracted.nr_carte_funciara)
+      // Parse raw OCR text for Romanian Extras Carte Funciara fields
+      const cfMatch =
+        text.match(/(?:Carte\s+Funciara|CF)\s+[Nn]r\.?\s*:?\s*(\d+)/i) ||
+        text.match(/[Nn]r\.?\s*(?:carte\s+funciara|CF)\s*:?\s*(\d+)/i)
+      if (cfMatch) setValue('nr_carte_funciara', cfMatch[1])
 
-      toast.success('Date extrase cu succes din extrasul CF!')
+      const cadastralMatch =
+        text.match(/[Nn]r\.?\s+[Cc]adastral\s*:?\s*(\d+)/i) ||
+        text.match(/[Cc]adastral\s+[Nn]r\.?\s*:?\s*(\d+)/i)
+      if (cadastralMatch) setValue('nr_cadastral', cadastralMatch[1])
+
+      const adresaMatch =
+        text.match(/(?:Adresa|Adresă|Situata|situată|Amplasament)\s*:?\s*([^\n]{10,100})/im) ||
+        text.match(/((?:Str\.|Strada|Bulevardul|Calea|Intrarea)\s+[^\n]{5,80})/im)
+      if (adresaMatch) setValue('adresa', adresaMatch[1].trim())
+
+      // Surface areas: look for labeled values (mp / m²)
+      const construitaMatch = text.match(/(?:construita|construită|desfasurata)\s*[:\-]?\s*(\d+(?:[.,]\d+)?)\s*m[p²2]/i)
+      if (construitaMatch) setValue('suprafata_construita', parseFloat(construitaMatch[1].replace(',', '.')))
+
+      const utilaMatch = text.match(/(?:utila|utilă)\s*[:\-]?\s*(\d+(?:[.,]\d+)?)\s*m[p²2]/i)
+      if (utilaMatch) setValue('suprafata_utila', parseFloat(utilaMatch[1].replace(',', '.')))
+
+      const terenMatch = text.match(/(?:teren|land)\s*[:\-]?\s*(\d+(?:[.,]\d+)?)\s*m[p²2]/i)
+      if (terenMatch) setValue('suprafata_teren', parseFloat(terenMatch[1].replace(',', '.')))
+
+      const fieldsFound = [cfMatch, cadastralMatch, adresaMatch, construitaMatch, utilaMatch, terenMatch].filter(Boolean).length
+      if (fieldsFound > 0) {
+        toast.success('Date extrase cu succes din extrasul CF!')
+      } else {
+        toast.error('Nu s-au putut extrage datele. Completeaza manual.')
+      }
     } catch {
       toast.error('Nu s-au putut extrage datele. Completeaza manual.')
     } finally {

@@ -31,25 +31,46 @@ export default function StepClientData({ data, onUpdate, onNext, onBack }: Props
 
     try {
       const formData = new FormData()
-      formData.append('image', file)
+      formData.append('file', file)
 
-      const res = await fetch('/api/ocr/buletin', {
+      const res = await fetch('/api/ocr', {
         method: 'POST',
         body: formData,
       })
 
-      if (!res.ok) throw new Error('OCR failed')
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.details ?? data?.error ?? 'OCR failed')
 
-      const extracted = await res.json()
+      const text: string = data.text ?? ''
 
-      if (extracted.nume) setValue('nume', extracted.nume)
-      if (extracted.prenume) setValue('prenume', extracted.prenume)
-      if (extracted.serie_buletin) setValue('serie_buletin', extracted.serie_buletin)
-      if (extracted.nr_buletin) setValue('nr_buletin', extracted.nr_buletin)
-      if (extracted.cnp) setValue('cnp', extracted.cnp)
-      if (extracted.adresa_domiciliu) setValue('adresa_domiciliu', extracted.adresa_domiciliu)
+      // Parse raw OCR text for Romanian ID card fields
+      const cnpMatch = text.match(/\b([1256]\d{12})\b/)
+      if (cnpMatch) setValue('cnp', cnpMatch[1])
 
-      toast.success('Date extrase cu succes din buletin!')
+      const serieMatch =
+        text.match(/(?:SERIA|Seria)\s+([A-Z]{2})\s+(?:NR\.?|Nr\.?)?\s*(\d{6})/i) ||
+        text.match(/\b([A-Z]{2})\s+(\d{6})\b/)
+      if (serieMatch) {
+        setValue('serie_buletin', serieMatch[1])
+        setValue('nr_buletin', serieMatch[2])
+      }
+
+      const numeMatch = text.match(/(?:Nume|NUME)[\/|]?(?:Name|NAME)?\s*\n?\s*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ\s-]{1,30})/m)
+      if (numeMatch) setValue('nume', numeMatch[1].trim())
+
+      const prenumeMatch = text.match(/(?:Prenume|PRENUME)[\/|]?(?:Given names?|GIVEN NAMES?)?\s*\n?\s*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ\s-]{1,40})/m)
+      if (prenumeMatch) setValue('prenume', prenumeMatch[1].trim())
+
+      const adresaMatch =
+        text.match(/(?:Adresa|ADRESA|Adresă|Domiciliu|DOMICILIU)\s*\n?\s*([^\n]{10,80})/im)
+      if (adresaMatch) setValue('adresa_domiciliu', adresaMatch[1].trim())
+
+      const fieldsFound = [cnpMatch, serieMatch, numeMatch, prenumeMatch, adresaMatch].filter(Boolean).length
+      if (fieldsFound > 0) {
+        toast.success('Date extrase cu succes din buletin!')
+      } else {
+        toast.error('Nu s-au putut extrage datele. Completeaza manual.')
+      }
     } catch {
       toast.error('Nu s-au putut extrage datele. Completeaza manual.')
     } finally {
