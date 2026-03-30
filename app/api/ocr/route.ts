@@ -10,16 +10,17 @@ export async function POST(request: NextRequest) {
     }
 
     const bytes = await file.arrayBuffer();
-    const base64 = Buffer.from(bytes).toString('base64');
+    const base64 = Buffer.from(new Uint8Array(bytes)).toString('base64');
 
     const credentials = JSON.parse(process.env.GOOGLE_VISION_CREDENTIALS || '{}');
+    const jwt = await createJWT(credentials);
     
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-        assertion: await createJWT(credentials),
+        assertion: jwt,
       }),
     });
 
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function createJWT(credentials: any): Promise<string> {
+async function createJWT(credentials: Record<string, string>): Promise<string> {
   const header = { alg: 'RS256', typ: 'JWT' };
   const now = Math.floor(Date.now() / 1000);
   const payload = {
@@ -63,7 +64,7 @@ async function createJWT(credentials: any): Promise<string> {
     exp: now + 3600,
   };
 
-  const encode = (obj: any) =>
+  const encode = (obj: unknown) =>
     Buffer.from(JSON.stringify(obj)).toString('base64url');
 
   const signingInput = `${encode(header)}.${encode(payload)}`;
@@ -82,13 +83,13 @@ async function createJWT(credentials: any): Promise<string> {
     new TextEncoder().encode(signingInput)
   );
 
-  return `${signingInput}.${Buffer.from(signature).toString('base64url')}`;
+  return `${signingInput}.${Buffer.from(new Uint8Array(signature)).toString('base64url')}`;
 }
 
-function pemToBuffer(pem: string): ArrayBuffer {
+function pemToBuffer(pem: string): Uint8Array {
   const base64 = pem
     .replace(/-----BEGIN PRIVATE KEY-----/, '')
     .replace(/-----END PRIVATE KEY-----/, '')
     .replace(/\n/g, '');
-  return Buffer.from(base64, 'base64');
+  return new Uint8Array(Buffer.from(base64, 'base64'));
 }
