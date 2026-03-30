@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createSign } from 'node:crypto';
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
     // ── 3. Obtain OAuth2 access token ────────────────────────────────────────
     let access_token: string;
     try {
-      const jwt = await createJWT(credentials);
+      const jwt = createJWT(credentials);
 
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
     } catch (authErr) {
       console.error('[OCR] Exception during OAuth token fetch:', authErr);
       return NextResponse.json(
-        { error: 'OCR authentication error' },
+        { error: 'OCR authentication error', details: authErr instanceof Error ? authErr.message : String(authErr) },
         { status: 502 }
       );
     }
@@ -138,7 +139,19 @@ export async function POST(request: NextRequest) {
 
 // ── JWT helpers ───────────────────────────────────────────────────────────────
 
-async function createJWT(credentials: Record<string, string>): Promise<string> {
+function normalizePem(raw: string): string {
+  // Vercel (and other platforms) can store the private_key with literal \n
+  // sequences instead of real newlines — handle all variants:
+  //   1. Already has real newlines  → fine as-is
+  //   2. Escaped \\n from double-serialised JSON → unescape once first
+  //   3. Literal \n (single backslash + n) → replace with real newline
+  return raw
+    .replace(/\\\\n/g, '\n')  // \\n  → real newline (double-escaped)
+    .replace(/\\n/g, '\n')    // \n   → real newline (single-escaped)
+    .trim();
+}
+
+function createJWT(credentials: Record<string, string>): string {
   const header = { alg: 'RS256', typ: 'JWT' };
   const now = Math.floor(Date.now() / 1000);
   const payload = {
@@ -154,32 +167,11 @@ async function createJWT(credentials: Record<string, string>): Promise<string> {
 
   const signingInput = `${encode(header)}.${encode(payload)}`;
 
-  const keyBuffer = pemToBuffer(credentials.private_key);
+  // Use node:crypto createSign — accepts PEM directly, no manual DER conversion
+  const pem = normalizePem(credentials.private_key);
+  const signer = createSign('RSA-SHA256');
+  signer.update(signingInput);
+  const signature = signer.sign(pem, 'base64url');
 
-  const privateKey = await crypto.subtle.importKey(
-    'pkcs8',
-    keyBuffer,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-
-  const signature = await crypto.subtle.sign(
-    'RSASSA-PKCS1-v1_5',
-    privateKey,
-    new TextEncoder().encode(signingInput)
-  );
-
-  return `${signingInput}.${Buffer.from(signature).toString('base64url')}`;
-}
-
-function pemToBuffer(pem: string): ArrayBuffer {
-  // Private keys stored in JSON env vars have literal \n — normalize both cases
-  const normalized = pem.replace(/\\n/g, '\n');
-  const base64 = normalized
-    .replace(/-----BEGIN PRIVATE KEY-----/g, '')
-    .replace(/-----END PRIVATE KEY-----/g, '')
-    .replace(/\s/g, '');
-  // Use Buffer (Node.js) instead of atob() which is a browser API
-  return Buffer.from(base64, 'base64').buffer;
+  return `${signingInput}.${signature}`;
 }
