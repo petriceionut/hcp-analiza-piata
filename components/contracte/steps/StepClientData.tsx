@@ -65,24 +65,23 @@ export default function StepClientData({ data, onUpdate, onNext, onBack }: Props
         setValue('nr_buletin', serieMatch[2])
       }
 
-      // Surname: label line contains "Nume" → skip to next line for value
-      const numeMatch = text.match(/(?:Nume|Nom|Surname)[^\n]*\n[ \t]*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ\s-]{1,30})/im)
+      // Surname: skip multilingual label line, capture value on next line.
+      // Use [ \t] NOT \s — \s includes \n which causes the match to bleed
+      // across lines and swallow the next label (e.g. "PRENUME", "CETĂȚENIE").
+      const numeMatch = text.match(/(?:Nume|Nom|Surname)[^\n]*\n[ \t]*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ \t-]{0,29})/im)
       if (numeMatch) setValue('nume', numeMatch[1].trim())
 
-      // Given name: label line contains "Prenume" → skip to next line for value
-      const prenumeMatch = text.match(/(?:Prenume|Pr[eé]nom|Given\s+names?)[^\n]*\n[ \t]*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ\s-]{1,40})/im)
+      // Given name: same fix — [ \t] stops the capture at end of line.
+      const prenumeMatch = text.match(/(?:Prenume|Pr[eé]nom|Given\s+names?)[^\n]*\n[ \t]*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ \t-]{0,39})/im)
       if (prenumeMatch) setValue('prenume', prenumeMatch[1].trim())
 
-      // Address: label line contains "Domiciliu" → skip to next line for value
-      // Address can span two lines (street on one, city on next); take both joined
-      const adresaMatch = text.match(/(?:Domiciliu|Adress[e]?|Address)[^\n]*\n[ \t]*([^\n]{5,80})(?:\n[ \t]*([^\n]{5,60}))?/im)
-      if (adresaMatch) {
-        const line1 = adresaMatch[1].trim()
-        const line2 = adresaMatch[2]?.trim()
-        // Only append second line if it looks like a continuation (starts with city/sector/jud)
-        const isSecondLineContinuation = line2 && /^(?:SECTOR|JUD|JUDEȚUL|MUNICIPIUL|ORAȘ|COMUNA|SAT|\d)/i.test(line2)
-        setValue('adresa_domiciliu', isSecondLineContinuation ? `${line1}, ${line2}` : line1)
-      }
+      // Address: anchor ONLY to "Domiciliu" — the Romanian label that appears
+      // directly above the address on the physical card. Do NOT use "Adresa" or
+      // "Address" as they appear on other multilingual label lines earlier on the
+      // card (e.g. birthplace), which would capture the wrong value.
+      // Romanian addresses are one long line: "Mun.Bucuresti Sec.5 Cal.Rahovei nr.325 bl.13 sc.A et.8 ap.44"
+      const adresaMatch = text.match(/Domiciliu[^\n]*\n[ \t]*([^\n]{5,150})/im)
+      if (adresaMatch) setValue('adresa_domiciliu', adresaMatch[1].trim())
 
       const fieldsFound = [cnpMatch, serieMatch, numeMatch, prenumeMatch, adresaMatch].filter(Boolean).length
       if (fieldsFound > 0) {

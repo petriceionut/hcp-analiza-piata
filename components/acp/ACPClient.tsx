@@ -36,22 +36,18 @@ function parseIDText(text: string): ExtractedIDData {
     result.nr_buletin = serieMatch[2]
   }
 
-  // Surname: label line "Nume/Nom/Surname" → skip rest of line → value on next line
-  const numeMatch = text.match(/(?:Nume|Nom|Surname)[^\n]*\n[ \t]*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ\s-]{1,30})/im)
+  // Surname: [ \t] instead of \s — stops capture at newline, not next label line
+  const numeMatch = text.match(/(?:Nume|Nom|Surname)[^\n]*\n[ \t]*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ \t-]{0,29})/im)
   if (numeMatch) result.nume = numeMatch[1].trim()
 
-  // Given name: label line "Prenume/Prénom/Given names" → skip → value on next line
-  const prenumeMatch = text.match(/(?:Prenume|Pr[eé]nom|Given\s+names?)[^\n]*\n[ \t]*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ\s-]{1,40})/im)
+  // Given name: same — [ \t] prevents bleeding into Cetățenie or next label
+  const prenumeMatch = text.match(/(?:Prenume|Pr[eé]nom|Given\s+names?)[^\n]*\n[ \t]*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ \t-]{0,39})/im)
   if (prenumeMatch) result.prenume = prenumeMatch[1].trim()
 
-  // Address: label line "Domiciliu/Adresse/Address" → skip → value on next line(s)
-  const adresaMatch = text.match(/(?:Domiciliu|Adress[e]?|Address)[^\n]*\n[ \t]*([^\n]{5,80})(?:\n[ \t]*([^\n]{5,60}))?/im)
-  if (adresaMatch) {
-    const line1 = adresaMatch[1].trim()
-    const line2 = adresaMatch[2]?.trim()
-    const isSecondLineContinuation = line2 && /^(?:SECTOR|JUD|JUDEȚUL|MUNICIPIUL|ORAȘ|COMUNA|SAT|\d)/i.test(line2)
-    result.adresa_domiciliu = isSecondLineContinuation ? `${line1}, ${line2}` : line1
-  }
+  // Address: anchor only to "Domiciliu" — not "Adresa/Address" which appears on
+  // other label lines (e.g. birthplace) before the actual domiciliu on the card
+  const adresaMatch = text.match(/Domiciliu[^\n]*\n[ \t]*([^\n]{5,150})/im)
+  if (adresaMatch) result.adresa_domiciliu = adresaMatch[1].trim()
 
   return result
 }
