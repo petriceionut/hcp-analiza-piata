@@ -43,15 +43,9 @@ export default function StepClientData({ data, onUpdate, onNext, onBack }: Props
 
       const text: string = data.text ?? ''
 
-      // Parse raw OCR text for Romanian ID card fields.
-      //
-      // Romanian ID cards use multilingual labels on ONE line, value on the NEXT:
-      //   Prenume/Prénom/Given names\nION GHEORGHE
-      //   Nume/Nom/Surname\nPOPESCU
-      //   Domiciliu/Adresse/Address\nSTR. FLORILOR NR. 5, SECTOR 3
-      //
-      // Pattern: match the Romanian keyword, skip rest of label line with [^\n]*,
-      // then capture the value on the following line.
+      // Log the full raw OCR text so we can see exactly what Google Vision returns.
+      // Check browser console (F12) and Vercel function logs for this output.
+      console.log('[OCR] Raw text from Google Vision:\n' + text)
 
       const cnpMatch = text.match(/\b([1256]\d{12})\b/)
       if (cnpMatch) setValue('cnp', cnpMatch[1])
@@ -65,25 +59,49 @@ export default function StepClientData({ data, onUpdate, onNext, onBack }: Props
         setValue('nr_buletin', serieMatch[2])
       }
 
-      // Surname: skip multilingual label line, capture value on next line.
-      // Use [ \t] NOT \s — \s includes \n which causes the match to bleed
-      // across lines and swallow the next label (e.g. "PRENUME", "CETĂȚENIE").
-      const numeMatch = text.match(/(?:Nume|Nom|Surname)[^\n]*\n[ \t]*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ \t-]{0,29})/im)
-      if (numeMatch) setValue('nume', numeMatch[1].trim())
+      // ── Name extraction ───────────────────────────────────────────────────
+      // BUG FIXED: the /i flag makes [A-ZĂÎȘȚÂ \t-] case-insensitive, so
+      // mixed-case label text like "Cetățenie" was matching the value capture
+      // group. Names on Romanian IDs are ALL-CAPS; value capture must be
+      // case-SENSITIVE (no i flag). We use a two-step approach:
+      //   Step 1 — text.search() with /i to locate the label (case-insensitive)
+      //   Step 2 — case-sensitive regex on the text after the label line
 
-      // Given name: same fix — [ \t] stops the capture at end of line.
-      const prenumeMatch = text.match(/(?:Prenume|Pr[eé]nom|Given\s+names?)[^\n]*\n[ \t]*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ \t-]{0,39})/im)
-      if (prenumeMatch) setValue('prenume', prenumeMatch[1].trim())
+      // Surname (Nume)
+      const numeLabelIdx = text.search(/(?:Nume|Nom|Surname)[^\n]*/i)
+      if (numeLabelIdx !== -1) {
+        // Drop everything up to and including the label line
+        const afterNume = text.slice(numeLabelIdx).replace(/^[^\n]+\n/, '')
+        // Case-sensitive: only ALL-CAPS Romanian letters, spaces, hyphens
+        const numeVal = afterNume.match(/^[ \t]*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ -]{1,29})[ \t]*$/m)
+        if (numeVal) setValue('nume', numeVal[1].trim())
+      }
 
-      // Address: anchor ONLY to "Domiciliu" — the Romanian label that appears
-      // directly above the address on the physical card. Do NOT use "Adresa" or
-      // "Address" as they appear on other multilingual label lines earlier on the
-      // card (e.g. birthplace), which would capture the wrong value.
-      // Romanian addresses are one long line: "Mun.Bucuresti Sec.5 Cal.Rahovei nr.325 bl.13 sc.A et.8 ap.44"
-      const adresaMatch = text.match(/Domiciliu[^\n]*\n[ \t]*([^\n]{5,150})/im)
+      // Given name (Prenume)
+      const prenumeLabelIdx = text.search(/(?:Prenume|Pr[eé]nom|Given\s+names?)[^\n]*/i)
+      if (prenumeLabelIdx !== -1) {
+        const afterPrenume = text.slice(prenumeLabelIdx).replace(/^[^\n]+\n/, '')
+        const prenumeVal = afterPrenume.match(/^[ \t]*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ -]{1,39})[ \t]*$/m)
+        if (prenumeVal) setValue('prenume', prenumeVal[1].trim())
+      }
+
+      // ── Address (Domiciliu) ───────────────────────────────────────────────
+      // Anchor ONLY to "Domiciliu" — never "Adresa/Address" which also appears
+      // on the Loc.nastere (birthplace) label line earlier on the card.
+      // Value may be on the SAME line as the label or on the NEXT line.
+      const domLabelIdx = text.search(/Domiciliu/i)
+      let adresaMatch: RegExpMatchArray | null = null
+      if (domLabelIdx !== -1) {
+        const fromDom = text.slice(domLabelIdx)
+        // Same line: "Domiciliu ... Mun.Bucuresti ..." (label and value together)
+        adresaMatch =
+          fromDom.match(/^Domiciliu[^\n]*?((?:Mun\.|Str\.|Cal\.|Calea|Sat |Com\.|Jud\.|Sector\s*\d)[^\n]{4,149})/i) ||
+          // Next line: standard label-above-value layout
+          fromDom.match(/^Domiciliu[^\n]*\n[ \t]*([^\n]{5,150})/i)
+      }
       if (adresaMatch) setValue('adresa_domiciliu', adresaMatch[1].trim())
 
-      const fieldsFound = [cnpMatch, serieMatch, numeMatch, prenumeMatch, adresaMatch].filter(Boolean).length
+      const fieldsFound = [cnpMatch, serieMatch, numeLabelIdx !== -1, prenumeLabelIdx !== -1, adresaMatch].filter(Boolean).length
       if (fieldsFound > 0) {
         toast.success('Date extrase cu succes din buletin!')
       } else {

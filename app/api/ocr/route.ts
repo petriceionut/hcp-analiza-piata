@@ -126,6 +126,7 @@ export async function POST(request: NextRequest) {
     const text: string = responseItem?.fullTextAnnotation?.text ?? '';
 
     console.log(`[OCR] Extracted ${text.length} characters from file "${file.name}"`);
+    console.log('[OCR] Full raw text:\n' + text);
 
     return NextResponse.json({ text, success: true });
   } catch (error) {
