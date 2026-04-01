@@ -9,6 +9,7 @@ interface Props {
   showSignatures?: boolean
   clientSignature?: string
   agentSignature?: string
+  onTextReady?: (text: string) => void
 }
 
 const CONTRACT_FILE: Record<string, string> = {
@@ -109,6 +110,7 @@ export default function ContractPreviewContent({
   showSignatures,
   clientSignature,
   agentSignature,
+  onTextReady,
 }: Props) {
   const [contractText, setContractText] = useState<string | null>(null)
   const [error, setError] = useState(false)
@@ -128,7 +130,11 @@ export default function ContractPreviewContent({
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.text()
       })
-      .then((text) => setContractText(applyPlaceholders(text, data)))
+      .then((text) => {
+        const processed = applyPlaceholders(text, data)
+        setContractText(processed)
+        onTextReady?.(processed)
+      })
       .catch(() => setError(true))
   // Re-run whenever any wizard data that feeds placeholders changes
   // eslint-disable-next-line react-hooks/exhaustive-deps
