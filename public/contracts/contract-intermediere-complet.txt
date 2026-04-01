@@ -1,0 +1,177 @@
+CONTRACT DE INTERMEDIERE IMOBILIARĂ – REPREZENTARE SIMPLA (NEEXCLUSIVĂ)
+Nr. {{NR_CONTRACT}} Data semnării: {{DATA_SEMNARE}} Data incepere aplicare {{DATA_INCEPERE}}
+
+Art. 1 PARTILE CONTRACTANTE
+HOME CAPITAL PARTNERS SRL, cu sediul
+social în Bucuresti, str. Apusului nr. 31, bl. M5,
+sc. B, et. 1, ap. 52, sector 6, Numar de ordine in
+Registrul comertului J20250612292003, cod
+unic de înregistrare 52331147, capital social
+200 lei, Cont: RO79BTRLRONCRT0CZ6691801
+deschis la Banca Transilvania, prin consultant
+imobiliar, {{AGENT_NUME}}
+tel {{AGENT_TEL}}
+e-mail {{AGENT_EMAIL}},
+pe de o parte in calitate de intermediar
+exclusiv şi numită în continuare „Agenţia”, şi
+
+Dl/D-na {{PRENUME_CLIENT}} {{NUME_CLIENT}}, având CNP
+{{CNP}} act de identitate seria {{SERIE_BULETIN}} nr {{NR_BULETIN}},
+domiciliat în {{ADRESA_CLIENT}},
+tel {{TEL_CLIENT}},
+e-mail {{EMAIL_CLIENT}},
+Împreuna şi în solidar / şi pentru / pentru
+Dl/D-na {{PRENUME_CLIENT2}} {{NUME_CLIENT2}}, având CNP
+{{CNP2}} act de identitate seria {{SERIE_BULETIN2}} nr {{NR_BULETIN2}},
+domiciliat în {{ADRESA_CLIENT2}},
+tel {{TEL_CLIENT2}},
+e-mail {{EMAIL_CLIENT2}},
+care declară că deţin(e) drepturile mai jos arătate asupra Imobilului
+descris in Contract, urmând a fi numit(i) în continuare simplu „Client”,
+
+a intervenit prezentul Contract de intermediere imobiliară („Contractul”).
+Art. 2 PROPRIETATEA LISTATĂ ȘI REPREZENTAREA PRIN AGENȚIE
+2.1. Clientul declară că intenţionează să înstrăineze dreptul de proprietate asupra Imobilului:
+{{DESCRIERE_IMOBIL}}
+situat in {{ADRESA_IMOBIL}}, inscris in CF {{NR_CF}}
+2.2. Vicii cunoscute de Client: {{VICII_CUNOSCUTE}}
+(Clientul garantează că toate informațiile și declarațiile furnizate Agenției cu privire la imobil sunt reale, complete și
+conforme cu realitatea juridică și factuală. Clientul răspunde exclusiv pentru orice prejudiciu cauzat de comunicarea
+unor informații eronate, incomplete sau înșelătoare și înţelege că orice vicii pe care le cunoaşte trebuie aduse la
+cunoştinţa Agenţiei de îndată)
+2.3. Preţul minim acceptat de Client pentru înstrăinarea bunului imobil este de {{PRET_MINIM}} EUR
+2.4. Prețul poate fi modificat oricând de către Client cu informarea prealabilă a Agenţiei.
+2.5. Termenul de valabilitate al acestui Contract este {{DURATA}} luni de la data semnării, respectiv până la data de {{DATA_EXPIRARE}}
+2.6. Termenul de protecție post-contractuală privind interdicția Clientului de a tranzacționa cu un terț identificat de
+Agenție este de 90 de zile de la data încetării prezentului contract. Un terț se va considera identificat de Agentie în
+oricare din situațiile de mai jos:
+(1) agentia a intrat în contact cu terțul și i-a prezentat Imobilul sau informații despre acesta prin orice mijloc de
+comunicare scrisă, în format hârtie sau electronic (email, sms, whatsapp, messenger, etc.);
+(2) agentia a efectuat o vizionare a Imobilului alături de terț;
+(3) agentia a oferit Clientului în scris (email, sms, whatsapp, messenger, etc.) datele de contact ale terțului.
+2.7. Agenţia nu prestează şi nu intermediază servicii tehnice (cadastrale, economice, juridice).
+Art. 3 DECLARAŢII ŞI CLARIFICĂRI
+3.1 Subsemnatul(a)/subsemnaţii {{PRENUME_CLIENT}} {{NUME_CLIENT}}
+declar(ăm) că înainte de semnarea prezentului Contract, am primit de la Agenţie următoarele:
+✓ proiectul (schiţa) prezentului Contract şi am avut posibilitatea să-l citesc, să solicit clarificări şi să formulez
+observaţii;
+✓ …………………………………………………………………………………………………………………………………………………………………………….............................................
+3.2 Se impune necesitatea de a clarifica cel puţin următoarele chestiuni care privesc Imobilul:
+✓ {{CLARIFICARI}}
+Art. 4 DREPTURILE SI OBLIGATIILE PARTILOR
+4.1 Agenţia se obligă:
+1) să desfășoare activități de promovare a proprietății ce face obiectul prezentului contract, prin mijloace proprii
+și pe canalele de publicitate pe care le consideră adecvate;
+2) să prezinte potențialilor clienți informații corecte, conforme cu cele furnizate de Client, fără omisiuni sau
+denaturări, respectând principiile bunei-credințe și ale transparenței în activitatea de intermediere;
+
+
+3) să notifice Clientul, în timp util, cu privire la orice demers relevant întreprins în baza prezentului contract,
+inclusiv programarea de vizionări, interesul manifestat de terți și eventuale oferte de tranzacționare;
+4) să asigure reprezentarea/asistarea a Clientului în vederea încheierii tranzacţiei;
+5) să păstreze confidențialitatea tuturor informațiilor primite de la Client, inclusiv, dar fără a se limita la, detalii
+financiare, acte de proprietate, date personale și strategii de vânzare/închiriere, cu excepția situațiilor în care
+divulgarea este impusă de lege sau necesară pentru îndeplinirea mandatului;
+6) Agenția va avea dreptul la comision doar în cazul în care tranzacția este finalizată ca urmare a intermedierii
+efective realizate de aceasta și cu un client introdus de ea, în perioada de valabilitate a prezentului contract
+sau în termenul de protecție.
+4.2 Clientul şi, în solidar cu acesta, semnatarul Contractului, se obligă:
+1) să pună la dispoziția Agenției, în termen rezonabil, toate documentele necesare care atestă dreptul de
+proprietate asupra imobilului, situația juridică a acestuia, precum și orice alte informații relevante solicitate
+în vederea promovării și intermedierii tranzacției;
+2) să colaboreze cu Agenția în mod activ și loial, facilitând accesul acesteia și al potențialilor clienți la imobil
+pentru realizarea vizionărilor, evaluărilor și altor activități necesare procesului de tranzacționare;
+3) să informeze Agenția în scris, în termen de maximum 3 (trei) zile lucrătoare, despre încheierea unei tranzacții
+de vânzare sau închiriere a imobilului ce face obiectul prezentului contract, indiferent dacă aceasta s-a
+realizat prin intermediul Agenției sau prin altă modalitate; să transmită Agenției o fotocopie a tranzacției;
+4) să achite Agenției comisionul convenit prin prezentul contract, în condițiile și la termenele stabilite, în cazul
+în care tranzacția se încheie cu un client prezentat de Agenție în perioada de valabilitate a contractului sau
+în termenul de protecție;
+5) să respecte toate prevederile prezentului contract, inclusiv cele referitoare la durată și încetare, fără a
+întreprinde acțiuni care ar putea prejudicia activitatea de intermediere desfășurată de Agenție;
+6) să comunice Agenției, în maxim 3 zile lucrătoare, orice modificare privind prețul de vânzare, condițiile
+tranzacției, disponibilitatea proprietății sau alte elemente esențiale ce pot influența desfășurarea mandatului.
+Art. 5 CONDIȚII FINANCIARE
+5.1 Pentru serviciile de intermediere prestate, Clientul se obligă să achite Agenției un comision în cuantum de {{COMISION}}% din prețul de vânzare al proprietății, comision calculat la valoarea totală convenită prin actul de înstrăinare.
+5.2 Clientul nu datoreaza Comision si rambursarea cheltuielilor de promovare când Contractul încetează prin
+ajungere la termen, fără a exclude aplicarea art. 5.3 (2) din Contract.
+5.3 Comisionul este scadent şi trebuie achitat, integral, în cuantumul prevazut la art. 5.1, de către Client:
+(1) dacă imobilul din Ofertă a făcut obiect al unei înţelegeri agreată de Client pe durata de valabilitate a
+prezentului Contract, cu un terț identificat de Agenție;
+(2) în cazul în care Clientul încheie o tranzacție de vânzare cu un terț identificat de Agenție, dar semnarea
+contractului de vânzare-cumpărare are loc după expirarea sau încetarea contractului.
+5.4 În cazul în care Agentia reușește să vândă Proprietatea la un preț superior celui convenit inițial de Părți, astfel
+cum a fost indicat la art. 2.4, Clientul va achita Agentiei un comision suplimentar denumit „Comision de Succes”,
+calculat astfel:
+(1) Valoarea acestuia este de 50% (procent aplicat la diferența dintre prețul de vânzare efectiv obținut și prețul
+convenit).
+(2) Comisionul de Succes se adaugă la comisionul standard stabilit la art. 5.1 pentru vânzarea proprietății.
+5.5 Comisionul este datorat Agenției în momentul semnării contractului de vânzare-cumpărare (sau a
+antecontractului, dacă părțile decid astfel) și se achită cel târziu în ziua semnării acestuia, în baza unei facturi emise
+de Agenție.
+5.6 În cazul în care prețul tranzacției este exprimat într-o monedă străină, comisionul va fi calculat la echivalentul
+în lei la cursul BNR din ziua semnării contractului de vânzare-cumpărare.
+5.8 În situația în care Clientul nu invită Agenţia la semnarea convenţiei sau nu comunică Agenţiei o copie a convenţiei
+conform art. 4.2 pct. 3) din Contract, Agenţia este îndreptăţită să calculeze Comisionul în raport de valoarea stipulată
+la art. 2.4.
+Art. 6 RASPUNDERE CONTRACTUALĂ
+6.1 Prezentul capitol reglementează condiţiile în care răspund părţile pentru neexecutarea obligaţiilor derivate din
+prezentul Contract.
+6.2 Depăşirea cu mai mult de 3 zile lucrătoare a termenului de plată, inclusiv în situaţia plăţii parţiale, atrage obligaţia
+Clientului de a achita penalităţi (daune moratorii) de 10 Euro/zi, calculate de la data scadenţei şi până la data plăţii
+efective. Penalităţile contractuale nu pot depăşi cuantumul comisionului datorat la scadenţă.
+6.3 Agenţia este îndreptăţită la o despăgubire egală cu Comisionul dacă nu încasează Comisionul sau deşi l-a încasat
+ajunge să fie obligată să restituie un Comision în toate situaţiile în care, după ce Clientul a încheiat o tranzacţie
+imobiliară în sensul arătat la art.2 din Contract:
+(1) Clientul nu îşi respectă obligaţiile faţă de Terţ sau,
+(2) atunci când Terţul nu-şi respectă propriile obligaţii, iar Clientul nu insistă în finalizarea tranzacţiei.
+
+
+Art. 7 ÎNCETAREA CONTRACTULUI
+7.1 Prezentul Contract încetează de drept:
+(1) la expirarea duratei pentru care a fost încheiat, fără a fi necesară vreo notificare prealabilă între părți;
+(2) oricând, prin reziliere înainte de termen, prin acordul scris al ambelor părți;
+(3) oricare dintre părți are dreptul de a denunța unilateral prezentul contract, cu notificare scrisă transmisă cu
+cel puțin 15 (cincisprezece) zile calendaristice înainte de data încetării. În cazul în care, până la data efectivă a
+încetării, Agenția a prezentat un client care finalizează tranzacția, aceasta are dreptul la comisionul convenit;
+(4) Contractul poate fi reziliat de plin drept, fără intervenția instanței și fără punere în întârziere, în cazul în care
+una dintre părți nu își îndeplinește în mod culpabil obligațiile contractuale, iar cealaltă parte notifică rezilierea în
+scris.
+(5) Încetarea contractului, indiferent de modalitatea în care intervine, nu afectează:
+a) dreptul Agenției de a încasa comisionul pentru tranzacțiile realizate cu clienți prezentați în perioada de
+valabilitate a contractului;
+b) aplicabilitatea clauzei de protecție post-contractuală, conform art. 2.
+(6) la data executării tuturor obligaţiilor asumate;
+(7) dacă forţa majoră împiedică una din părţi să-şi execute o obligaţie esenţială timp de 3 luni;
+7.2 Încetarea în orice fel a efectelor prezentului Contract nu afectează obligaţiile anterior asumate şi scadente,
+dreptul Părţii care a notificat rezilierea de a fi despăgubită ori curgerea penalităţilor.
+ART. 8 ALTE CLAUZE NEGOCIATE
+După discuţii, Părţile au negociat următoarele derogări ori, după caz, modificări faţă de Contract
+{{DEROGARI}}
+Art. 9 ACORD PRIVIND PRELUCRAREA DATELOR CU CARACTER PERSONAL
+9.1 Clientul își exprimă acordul expres pentru ca Agenția să colecteze, utilizeze și prelucreze datele sale cu caracter
+personal în scopul desfășurării activității de intermediere imobiliară și îndeplinirii obligațiilor legale aferente.
+9.2 Datele prelucrate pot include, fără a se limita: nume, prenume, date de contact, date din actul de identitate,
+informații privind proprietatea, acte justificative și orice alte date necesare în contextul vânzării imobilului.
+9.3 Agenția se obligă să păstreze confidențialitatea datelor, să le utilizeze exclusiv în scopurile prevăzute și să
+asigure securitatea acestora conform legislației în vigoare (Regulamentul UE 679/2016 – GDPR).
+9.4 Datele pot fi transmise către terți (notari publici, instituții bancare, autorități publice, parteneri contractuali),
+exclusiv în scopul realizării tranzacției sau pentru îndeplinirea obligațiilor legale ale Agenției, cu respectarea
+dispozițiilor legale privind protecția datelor.
+9.5 Clientul are dreptul de acces, rectificare, ștergere, restricționare a prelucrării sau opoziție, printr-o cerere
+transmisă la adresa de e-mail a Agenției.
+Art. 9 CLAUZE FINALE
+9.6 Prezentul contract reprezintă menţiunea exclusivă a înţelegerii părţilor şi exclude de la data semnării orice alte
+înţelegeri anterioare, scrise sau verbale, iar modificări pot interveni doar prin Act adiţional scris.
+9.7 Constituie cauze de forţă majoră orice eveniment care afectează imobilul de natură să atragă ineficacitatea
+Ofertei imobiliare a Clientului.
+9.8 Orice sumă datorată potrivit prezentului Contract este scadentă în ziua împlinirii termenului stipulat, debitorul
+fiind de drept în întârziere fără a fi necesară punerea în întârziere ori altă formalitate.
+9.9 Orice comunicare în executarea prezentului Contract este valabilă în măsura în care poate fi verificată identitatea
+expeditorului, a datei expedierii şi a datei recepţiei, precum şi conţinutul complet si lizibil al comunicării.
+9.10 Orice litigiu privind valabilitatea, executarea ori interpretarea Contractului este de competenţa instanţelor
+judecătoreşti de unde își are sediul Agenția.
+CLIENT
+
+AGENTIE
+
