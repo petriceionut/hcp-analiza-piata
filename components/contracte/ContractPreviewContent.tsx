@@ -163,12 +163,35 @@ export default function ContractPreviewContent({
     )
   }
 
+  // Split on one-or-more blank lines to get paragraphs/articles.
+  // Within each block, internal line breaks are preserved via whitespace-pre-wrap.
+  const blocks = contractText.split(/\n{2,}/).filter((b) => b.trim())
+
+  const isArticleHeader = (block: string) =>
+    /^(Art\.|ART\.)/.test(block.trim())
+
+  const isDocHeader = (block: string, idx: number) => idx === 0
+
   return (
-    <div className="contract-preview font-serif text-sm leading-relaxed">
-      {/* Contract body — whitespace preserved to match the source text file */}
-      <pre className="whitespace-pre-wrap font-serif text-sm leading-relaxed text-gray-900 mb-10">
-        {contractText}
-      </pre>
+    <div className="contract-preview font-serif text-gray-900">
+      {/* Contract body */}
+      <div className="mb-10 space-y-0">
+        {blocks.map((block, idx) => (
+          <p
+            key={idx}
+            className={[
+              'whitespace-pre-wrap text-[13px] leading-[1.75]',
+              isDocHeader(block, idx)
+                ? 'text-center font-semibold text-base mb-4'
+                : isArticleHeader(block)
+                ? 'mt-5 mb-1 font-semibold'
+                : 'mb-3',
+            ].join(' ')}
+          >
+            {block}
+          </p>
+        ))}
+      </div>
 
       {/* Signatures */}
       <div className="mt-10 grid grid-cols-2 gap-8 border-t border-gray-200 pt-8">
