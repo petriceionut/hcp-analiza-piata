@@ -13,28 +13,47 @@ interface Props {
 
 interface ConditiiForm {
   durata: number
+  dataIncepere: string
   comision: number
+  viciiCunoscute?: string
+  pretMinim?: number
+  clarificari?: string
+  cheltuieliLunare?: number
 }
 
 export default function StepConditii({ data, onUpdate, onNext, onBack }: Props) {
   const { register, handleSubmit, formState: { errors } } = useForm<ConditiiForm>({
     defaultValues: {
       durata: data.durata ?? 6,
+      dataIncepere: data.dataIncepere ?? '',
       comision: data.comision,
+      viciiCunoscute: data.viciiCunoscute ?? '',
+      pretMinim: data.pretMinim,
+      clarificari: data.clarificari ?? '',
+      cheltuieliLunare: data.cheltuieliLunare,
     },
   })
 
   const onSubmit = (values: ConditiiForm) => {
-    onUpdate({ durata: values.durata, comision: values.comision })
+    onUpdate({
+      durata: values.durata,
+      dataIncepere: values.dataIncepere,
+      comision: values.comision,
+      viciiCunoscute: values.viciiCunoscute,
+      pretMinim: values.pretMinim,
+      clarificari: values.clarificari,
+      cheltuieliLunare: values.cheltuieliLunare,
+    })
     onNext()
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="p-6">
       <h2 className="text-lg font-semibold text-slate-900 mb-1">Condiții contract</h2>
-      <p className="text-sm text-slate-500 mb-6">Stabilește durata contractului și comisionul agenției</p>
+      <p className="text-sm text-slate-500 mb-6">Stabilește durata, comisionul și condițiile specifice</p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+      {/* Duration / start date / commission */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
         <div>
           <label className="label">Durata contractului *</label>
           <select
@@ -51,6 +70,16 @@ export default function StepConditii({ data, onUpdate, onNext, onBack }: Props) 
         </div>
 
         <div>
+          <label className="label">Data începere aplicare *</label>
+          <input
+            {...register('dataIncepere', { required: 'Data de începere este obligatorie' })}
+            type="date"
+            className="input-field"
+          />
+          {errors.dataIncepere && <p className="text-red-500 text-xs mt-1">{errors.dataIncepere.message}</p>}
+        </div>
+
+        <div>
           <label className="label">Comision agenție (%) *</label>
           <div className="relative">
             <input
@@ -58,7 +87,7 @@ export default function StepConditii({ data, onUpdate, onNext, onBack }: Props) 
                 required: 'Comisionul este obligatoriu',
                 valueAsNumber: true,
                 min: { value: 0.1, message: 'Comisionul trebuie să fie pozitiv' },
-                max: { value: 100, message: 'Comisionul nu poate depăși 100%' },
+                max: { value: 100, message: 'Nu poate depăși 100%' },
               })}
               type="number"
               step="0.1"
@@ -71,6 +100,57 @@ export default function StepConditii({ data, onUpdate, onNext, onBack }: Props) 
           </div>
           {errors.comision && <p className="text-red-500 text-xs mt-1">{errors.comision.message}</p>}
         </div>
+      </div>
+
+      {/* Pret minim + cheltuieli */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <div>
+          <label className="label">Preț minim acceptat (EUR)</label>
+          <input
+            {...register('pretMinim', { valueAsNumber: true, min: { value: 0, message: 'Trebuie să fie pozitiv' } })}
+            type="number"
+            min="0"
+            step="1000"
+            className="input-field"
+            placeholder="ex: 120000"
+          />
+          {errors.pretMinim && <p className="text-red-500 text-xs mt-1">{errors.pretMinim.message}</p>}
+        </div>
+
+        <div>
+          <label className="label">Cheltuieli lunare (lei/lună)</label>
+          <input
+            {...register('cheltuieliLunare', { valueAsNumber: true, min: { value: 0, message: 'Trebuie să fie pozitiv' } })}
+            type="number"
+            min="0"
+            step="100"
+            className="input-field"
+            placeholder="ex: 500"
+          />
+          {errors.cheltuieliLunare && <p className="text-red-500 text-xs mt-1">{errors.cheltuieliLunare.message}</p>}
+        </div>
+      </div>
+
+      {/* Vicii cunoscute */}
+      <div className="mb-4">
+        <label className="label">Vicii cunoscute de Client</label>
+        <textarea
+          {...register('viciiCunoscute')}
+          rows={3}
+          className="input-field resize-none"
+          placeholder="Descrieți orice vicii cunoscute ale imobilului…"
+        />
+      </div>
+
+      {/* Clarificari */}
+      <div className="mb-6">
+        <label className="label">Clarificări</label>
+        <textarea
+          {...register('clarificari')}
+          rows={3}
+          className="input-field resize-none"
+          placeholder="Chestiuni ce necesită clarificare privind imobilul…"
+        />
       </div>
 
       <div className="flex justify-between">
