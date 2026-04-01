@@ -1,27 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-interface SignWellSigner {
-  id: string
-  name: string
-  email: string
-}
-
-interface SignWellFile {
-  name: string
-  file_base64: string
-}
-
-interface SignWellDocumentPayload {
-  test_mode: boolean
-  files: SignWellFile[]
-  signers: SignWellSigner[]
-  name: string
-  subject: string
-  message: string
-  send_emails: boolean
-}
-
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -43,6 +22,7 @@ export async function POST(
       .single()
 
     if (fetchError || !contract) {
+      console.error('[trimite] Contract not found:', fetchError)
       return NextResponse.json({ error: 'Contract not found' }, { status: 404 })
     }
 
@@ -54,25 +34,30 @@ export async function POST(
       return NextResponse.json({ error: 'Client email is missing' }, { status: 400 })
     }
 
-    // Call SignWell API
+    // Check API key
     const apiKey = process.env.SIGNWELL_API_KEY
+    console.log('[trimite] SIGNWELL_API_KEY present:', !!apiKey, '| length:', apiKey?.length ?? 0)
     if (!apiKey) {
       return NextResponse.json({ error: 'SIGNWELL_API_KEY not configured' }, { status: 500 })
     }
 
-    const payload: SignWellDocumentPayload = {
-      test_mode: process.env.NODE_ENV !== 'production',
+    // due_date = 14 days from now
+    const dueDate = new Date()
+    dueDate.setDate(dueDate.getDate() + 14)
+    const dueDateStr = dueDate.toISOString().split('T')[0] // YYYY-MM-DD
+
+    const payload = {
+      test_mode: process.env.NODE_ENV !== 'production' ? 1 : 0,
+      draft: false,
       name: `Contract ${contract.id}`,
-      subject: 'Vă rugăm să semnați contractul',
-      message: 'Ați primit un contract pentru semnare. Vă rugăm să îl revizuiți și semnați.',
-      send_emails: true,
+      due_date: dueDateStr,
       files: [
         {
           name: 'contract.pdf',
-          file_base64: pdfBase64,
+          base64_file_contents: pdfBase64,
         },
       ],
-      signers: [
+      recipients: [
         {
           id: '1',
           name: clientName,
@@ -81,22 +66,29 @@ export async function POST(
       ],
     }
 
-    const signwellRes = await fetch('https://www.signwell.com/api/v1/documents', {
+    console.log('[trimite] Sending to SignWell | recipient:', clientEmail, '| doc name:', payload.name)
+
+    const signwellRes = await fetch('https://www.signwell.com/api/v1/documents/', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Api-Key': apiKey,
+        'api_token': apiKey,
       },
       body: JSON.stringify(payload),
     })
 
+    const responseText = await signwellRes.text()
+    console.log('[trimite] SignWell status:', signwellRes.status)
+    console.log('[trimite] SignWell response:', responseText)
+
     if (!signwellRes.ok) {
-      const errBody = await signwellRes.text()
-      console.error('[SignWell API error]', signwellRes.status, errBody)
-      return NextResponse.json({ error: 'SignWell API error', detail: errBody }, { status: 502 })
+      return NextResponse.json(
+        { error: 'SignWell API error', detail: responseText, status: signwellRes.status },
+        { status: 502 }
+      )
     }
 
-    const signwellData = await signwellRes.json()
+    const signwellData = JSON.parse(responseText)
     const signwellDocumentId = signwellData.id as string
 
     // Update contract status in Supabase
@@ -108,11 +100,15 @@ export async function POST(
       })
       .eq('id', params.id)
 
-    if (updateError) throw updateError
+    if (updateError) {
+      console.error('[trimite] Supabase update error:', updateError)
+      throw updateError
+    }
 
+    console.log('[trimite] Success | signwell_document_id:', signwellDocumentId)
     return NextResponse.json({ signwellDocumentId })
   } catch (err) {
-    console.error('[POST /api/contracts/[id]/trimite]', err)
+    console.error('[POST /api/contracts/[id]/trimite] Unexpected error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

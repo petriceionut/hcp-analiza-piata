@@ -95,7 +95,8 @@ export default function StepPreview({ data, onBack }: Props) {
 
       if (!sendRes.ok) {
         const errData = await sendRes.json().catch(() => ({}))
-        throw new Error(errData?.error ?? 'Failed to send contract')
+        console.error('[StepPreview] Send failed:', errData)
+        throw new Error(errData?.detail ?? errData?.error ?? `Failed to send contract (${sendRes.status})`)
       }
 
       setSent(true)
