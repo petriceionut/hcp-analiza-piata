@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { ClientData } from '@/types'
 import { WizardData } from '../ContractWizard'
-import { ArrowRight, ArrowLeft, Camera, Upload, Loader2, X, ScanLine } from 'lucide-react'
+import { ArrowRight, ArrowLeft, Camera, Upload, Loader2, X, ScanLine, Users } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface Props {
@@ -14,279 +14,309 @@ interface Props {
   onBack: () => void
 }
 
-export default function StepClientData({ data, onUpdate, onNext, onBack }: Props) {
-  const [ocrLoading, setOcrLoading] = useState(false)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const cameraInputRef = useRef<HTMLInputElement>(null)
+async function runOCR(
+  file: File,
+  setValue: (field: keyof ClientData, value: string) => void,
+  setPreviewUrl: (u: string | null) => void,
+  setLoading: (b: boolean) => void,
+) {
+  setLoading(true)
+  setPreviewUrl(URL.createObjectURL(file))
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await fetch('/api/ocr', { method: 'POST', body: formData })
+    const json = await res.json()
+    if (!res.ok) throw new Error(json?.details ?? json?.error ?? 'OCR failed')
 
-  const { register, handleSubmit, setValue, formState: { errors } } = useForm<ClientData>({
-    defaultValues: data.clientData as ClientData,
-  })
+    const text: string = json.text ?? ''
+    console.log('[OCR] Raw text from Google Vision:\n' + text)
 
-  const processOCR = async (file: File) => {
-    setOcrLoading(true)
-    const url = URL.createObjectURL(file)
-    setPreviewUrl(url)
+    const cnpMatch = text.match(/\b([1256]\d{12})\b/)
+    if (cnpMatch) setValue('cnp', cnpMatch[1])
 
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-
-      const res = await fetch('/api/ocr', {
-        method: 'POST',
-        body: formData,
-      })
-
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.details ?? data?.error ?? 'OCR failed')
-
-      const text: string = data.text ?? ''
-
-      // Log the full raw OCR text so we can see exactly what Google Vision returns.
-      // Check browser console (F12) and Vercel function logs for this output.
-      console.log('[OCR] Raw text from Google Vision:\n' + text)
-
-      const cnpMatch = text.match(/\b([1256]\d{12})\b/)
-      if (cnpMatch) setValue('cnp', cnpMatch[1])
-
-      // Series: "Seria/Série/Series IF Nr./No. 123456" — all on one line
-      const serieMatch =
-        text.match(/(?:Seria|S[eé]rie|Series)[^\n]*?\b([A-Z]{2})\b[^\n]*?\b(\d{6})\b/i) ||
-        text.match(/\b([A-Z]{2})\s+(\d{6})\b/)
-      if (serieMatch) {
-        setValue('serie_buletin', serieMatch[1])
-        setValue('nr_buletin', serieMatch[2])
-      }
-
-      // ── Name extraction ───────────────────────────────────────────────────
-      // BUG FIXED: the /i flag makes [A-ZĂÎȘȚÂ \t-] case-insensitive, so
-      // mixed-case label text like "Cetățenie" was matching the value capture
-      // group. Names on Romanian IDs are ALL-CAPS; value capture must be
-      // case-SENSITIVE (no i flag). We use a two-step approach:
-      //   Step 1 — text.search() with /i to locate the label (case-insensitive)
-      //   Step 2 — case-sensitive regex on the text after the label line
-
-      // Surname (Nume)
-      const numeLabelIdx = text.search(/(?:Nume|Nom|Surname)[^\n]*/i)
-      if (numeLabelIdx !== -1) {
-        // Drop everything up to and including the label line
-        const afterNume = text.slice(numeLabelIdx).replace(/^[^\n]+\n/, '')
-        // Case-sensitive: only ALL-CAPS Romanian letters, spaces, hyphens
-        const numeVal = afterNume.match(/^[ \t]*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ -]{1,29})[ \t]*$/m)
-        if (numeVal) setValue('nume', numeVal[1].trim())
-      }
-
-      // Given name (Prenume)
-      const prenumeLabelIdx = text.search(/(?:Prenume|Pr[eé]nom|Given\s+names?)[^\n]*/i)
-      if (prenumeLabelIdx !== -1) {
-        const afterPrenume = text.slice(prenumeLabelIdx).replace(/^[^\n]+\n/, '')
-        const prenumeVal = afterPrenume.match(/^[ \t]*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ -]{1,39})[ \t]*$/m)
-        if (prenumeVal) setValue('prenume', prenumeVal[1].trim())
-      }
-
-      // ── Address (Domiciliu) ───────────────────────────────────────────────
-      // Anchor ONLY to "Domiciliu" — never "Adresa/Address" which also appears
-      // on the Loc.nastere (birthplace) label line earlier on the card.
-      // Value may be on the SAME line as the label or on the NEXT line.
-      const domLabelIdx = text.search(/Domiciliu/i)
-      let adresaMatch: RegExpMatchArray | null = null
-      if (domLabelIdx !== -1) {
-        const fromDom = text.slice(domLabelIdx)
-        // Same line: "Domiciliu ... Mun.Bucuresti ..." (label and value together)
-        adresaMatch =
-          fromDom.match(/^Domiciliu[^\n]*?((?:Mun\.|Str\.|Cal\.|Calea|Sat |Com\.|Jud\.|Sector\s*\d)[^\n]{4,149})/i) ||
-          // Next line: standard label-above-value layout
-          fromDom.match(/^Domiciliu[^\n]*\n[ \t]*([^\n]{5,150})/i)
-      }
-      if (adresaMatch) setValue('adresa_domiciliu', adresaMatch[1].trim())
-
-      const fieldsFound = [cnpMatch, serieMatch, numeLabelIdx !== -1, prenumeLabelIdx !== -1, adresaMatch].filter(Boolean).length
-      if (fieldsFound > 0) {
-        toast.success('Date extrase cu succes din buletin!')
-      } else {
-        toast.error('Nu s-au putut extrage datele. Completeaza manual.')
-      }
-    } catch {
-      toast.error('Nu s-au putut extrage datele. Completeaza manual.')
-    } finally {
-      setOcrLoading(false)
+    const serieMatch =
+      text.match(/(?:Seria|S[eé]rie|Series)[^\n]*?\b([A-Z]{2})\b[^\n]*?\b(\d{6})\b/i) ||
+      text.match(/\b([A-Z]{2})\s+(\d{6})\b/)
+    if (serieMatch) {
+      setValue('serie_buletin', serieMatch[1])
+      setValue('nr_buletin', serieMatch[2])
     }
-  }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) processOCR(file)
-  }
+    const numeLabelIdx = text.search(/(?:Nume|Nom|Surname)[^\n]*/i)
+    if (numeLabelIdx !== -1) {
+      const afterNume = text.slice(numeLabelIdx).replace(/^[^\n]+\n/, '')
+      const numeVal = afterNume.match(/^[ \t]*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ -]{1,29})[ \t]*$/m)
+      if (numeVal) setValue('nume', numeVal[1].trim())
+    }
 
-  const onSubmit = (values: ClientData) => {
-    onUpdate({ clientData: values })
-    onNext()
-  }
+    const prenumeLabelIdx = text.search(/(?:Prenume|Pr[eé]nom|Given\s+names?)[^\n]*/i)
+    if (prenumeLabelIdx !== -1) {
+      const afterPrenume = text.slice(prenumeLabelIdx).replace(/^[^\n]+\n/, '')
+      const prenumeVal = afterPrenume.match(/^[ \t]*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ -]{1,39})[ \t]*$/m)
+      if (prenumeVal) setValue('prenume', prenumeVal[1].trim())
+    }
 
+    const domLabelIdx = text.search(/Domiciliu/i)
+    let adresaMatch: RegExpMatchArray | null = null
+    if (domLabelIdx !== -1) {
+      const fromDom = text.slice(domLabelIdx)
+      adresaMatch =
+        fromDom.match(/^Domiciliu[^\n]*?((?:Mun\.|Str\.|Cal\.|Calea|Sat |Com\.|Jud\.|Sector\s*\d)[^\n]{4,149})/i) ||
+        fromDom.match(/^Domiciliu[^\n]*\n[ \t]*([^\n]{5,150})/i)
+    }
+    if (adresaMatch) setValue('adresa_domiciliu', adresaMatch[1].trim())
+
+    const fieldsFound = [cnpMatch, serieMatch, numeLabelIdx !== -1, prenumeLabelIdx !== -1, adresaMatch].filter(Boolean).length
+    if (fieldsFound > 0) {
+      toast.success('Date extrase cu succes din buletin!')
+    } else {
+      toast.error('Nu s-au putut extrage datele. Completează manual.')
+    }
+  } catch {
+    toast.error('Nu s-au putut extrage datele. Completează manual.')
+  } finally {
+    setLoading(false)
+  }
+}
+
+function ClientOCRBox({
+  loading,
+  previewUrl,
+  onFile,
+  onClearPreview,
+}: {
+  loading: boolean
+  previewUrl: string | null
+  onFile: (f: File) => void
+  onClearPreview: () => void
+}) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const camRef = useRef<HTMLInputElement>(null)
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="p-6">
-      <h2 className="text-lg font-semibold text-slate-900 mb-1">Date client</h2>
-      <p className="text-sm text-slate-500 mb-6">Completeaza datele clientului sau fotografiaza buletinul</p>
-
-      {/* OCR options */}
-      <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6">
-        <div className="flex items-center gap-2 mb-3">
-          <ScanLine className="w-4 h-4 text-blue-600" />
-          <span className="text-sm font-semibold text-blue-700">Completare automata din buletin</span>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          {/* Camera capture */}
-          <button
-            type="button"
-            onClick={() => cameraInputRef.current?.click()}
-            disabled={ocrLoading}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-lg text-sm font-medium transition-colors"
-          >
-            <Camera className="w-4 h-4" />
-            Fotografiaza buletinul
-          </button>
-          {/* File upload */}
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={ocrLoading}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-blue-200 hover:bg-blue-50 text-blue-700 rounded-lg text-sm font-medium transition-colors"
-          >
-            <Upload className="w-4 h-4" />
-            Incarca fotografie
-          </button>
-          {ocrLoading && (
-            <div className="flex items-center gap-2 text-sm text-blue-600">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Se extrag datele...
-            </div>
-          )}
-        </div>
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleFileChange}
-        />
-        <input
-          ref={cameraInputRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          className="hidden"
-          onChange={handleFileChange}
-        />
-
-        {previewUrl && (
-          <div className="mt-3 relative inline-block">
-            <img src={previewUrl} alt="Buletin" className="h-20 rounded-lg object-cover" />
-            <button
-              type="button"
-              onClick={() => setPreviewUrl(null)}
-              className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center"
-            >
-              <X className="w-3 h-3 text-white" />
-            </button>
+    <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-4">
+      <div className="flex items-center gap-2 mb-3">
+        <ScanLine className="w-4 h-4 text-blue-600" />
+        <span className="text-sm font-semibold text-blue-700">Completare automată din buletin</span>
+      </div>
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="button"
+          onClick={() => camRef.current?.click()}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-lg text-sm font-medium transition-colors"
+        >
+          <Camera className="w-4 h-4" />
+          Fotografiază buletinul
+        </button>
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 bg-white border border-blue-200 hover:bg-blue-50 text-blue-700 rounded-lg text-sm font-medium transition-colors"
+        >
+          <Upload className="w-4 h-4" />
+          Încarcă fotografie
+        </button>
+        {loading && (
+          <div className="flex items-center gap-2 text-sm text-blue-600">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Se extrag datele…
           </div>
         )}
       </div>
+      <input ref={fileRef} type="file" accept="image/*" className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f) }} />
+      <input ref={camRef} type="file" accept="image/*" capture="environment" className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f) }} />
+      {previewUrl && (
+        <div className="mt-3 relative inline-block">
+          <img src={previewUrl} alt="Buletin" className="h-20 rounded-lg object-cover" />
+          <button
+            type="button"
+            onClick={onClearPreview}
+            className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center"
+          >
+            <X className="w-3 h-3 text-white" />
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
 
-      {/* Form fields */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+export default function StepClientData({ data, onUpdate, onNext, onBack }: Props) {
+  const [hasCoproprietar, setHasCoproprietar] = useState(!!data.clientData2)
+
+  // Client 1 OCR state
+  const [ocr1Loading, setOcr1Loading] = useState(false)
+  const [preview1, setPreview1] = useState<string | null>(null)
+
+  // Client 2 OCR state
+  const [ocr2Loading, setOcr2Loading] = useState(false)
+  const [preview2, setPreview2] = useState<string | null>(null)
+
+  const form1 = useForm<ClientData>({ defaultValues: data.clientData as ClientData })
+  const form2 = useForm<ClientData>({ defaultValues: data.clientData2 as ClientData })
+
+  const handleSubmit1 = form1.handleSubmit((values1) => {
+    if (hasCoproprietar) {
+      form2.handleSubmit((values2) => {
+        onUpdate({ clientData: values1, clientData2: values2 })
+        onNext()
+      })()
+    } else {
+      onUpdate({ clientData: values1, clientData2: undefined })
+      onNext()
+    }
+  })
+
+  return (
+    <form onSubmit={handleSubmit1} className="p-6">
+      <h2 className="text-lg font-semibold text-slate-900 mb-1">Date client</h2>
+      <p className="text-sm text-slate-500 mb-6">Completează datele clientului sau fotografiază buletinul</p>
+
+      {/* ── Client 1 ── */}
+      <ClientOCRBox
+        loading={ocr1Loading}
+        previewUrl={preview1}
+        onFile={(f) => runOCR(f, form1.setValue, setPreview1, setOcr1Loading)}
+        onClearPreview={() => setPreview1(null)}
+      />
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
         <div>
           <label className="label">Nume *</label>
-          <input
-            {...register('nume', { required: 'Numele este obligatoriu' })}
-            className="input-field"
-            placeholder="ex: POPESCU"
-          />
-          {errors.nume && <p className="text-red-500 text-xs mt-1">{errors.nume.message}</p>}
+          <input {...form1.register('nume', { required: 'Numele este obligatoriu' })}
+            className="input-field" placeholder="ex: POPESCU" />
+          {form1.formState.errors.nume && <p className="text-red-500 text-xs mt-1">{form1.formState.errors.nume.message}</p>}
         </div>
-
         <div>
           <label className="label">Prenume *</label>
-          <input
-            {...register('prenume', { required: 'Prenumele este obligatoriu' })}
-            className="input-field"
-            placeholder="ex: ION"
-          />
-          {errors.prenume && <p className="text-red-500 text-xs mt-1">{errors.prenume.message}</p>}
+          <input {...form1.register('prenume', { required: 'Prenumele este obligatoriu' })}
+            className="input-field" placeholder="ex: ION" />
+          {form1.formState.errors.prenume && <p className="text-red-500 text-xs mt-1">{form1.formState.errors.prenume.message}</p>}
         </div>
-
         <div>
           <label className="label">Serie buletin *</label>
-          <input
-            {...register('serie_buletin', { required: 'Seria este obligatorie' })}
-            className="input-field"
-            placeholder="ex: IF"
-            maxLength={2}
-          />
-          {errors.serie_buletin && <p className="text-red-500 text-xs mt-1">{errors.serie_buletin.message}</p>}
+          <input {...form1.register('serie_buletin', { required: 'Seria este obligatorie' })}
+            className="input-field" placeholder="ex: IF" maxLength={2} />
+          {form1.formState.errors.serie_buletin && <p className="text-red-500 text-xs mt-1">{form1.formState.errors.serie_buletin.message}</p>}
         </div>
-
         <div>
           <label className="label">Nr. buletin *</label>
-          <input
-            {...register('nr_buletin', { required: 'Numarul este obligatoriu' })}
-            className="input-field"
-            placeholder="ex: 123456"
-            maxLength={6}
-          />
-          {errors.nr_buletin && <p className="text-red-500 text-xs mt-1">{errors.nr_buletin.message}</p>}
+          <input {...form1.register('nr_buletin', { required: 'Numărul este obligatoriu' })}
+            className="input-field" placeholder="ex: 123456" maxLength={6} />
+          {form1.formState.errors.nr_buletin && <p className="text-red-500 text-xs mt-1">{form1.formState.errors.nr_buletin.message}</p>}
         </div>
-
         <div>
           <label className="label">CNP *</label>
-          <input
-            {...register('cnp', {
-              required: 'CNP-ul este obligatoriu',
-              pattern: { value: /^\d{13}$/, message: 'CNP invalid (13 cifre)' },
-            })}
-            className="input-field"
-            placeholder="ex: 1900101123456"
-            maxLength={13}
-          />
-          {errors.cnp && <p className="text-red-500 text-xs mt-1">{errors.cnp.message}</p>}
+          <input {...form1.register('cnp', {
+            required: 'CNP-ul este obligatoriu',
+            pattern: { value: /^\d{13}$/, message: 'CNP invalid (13 cifre)' },
+          })} className="input-field" placeholder="ex: 1900101123456" maxLength={13} />
+          {form1.formState.errors.cnp && <p className="text-red-500 text-xs mt-1">{form1.formState.errors.cnp.message}</p>}
         </div>
-
         <div>
           <label className="label">Nr. telefon *</label>
-          <input
-            {...register('telefon', { required: 'Telefonul este obligatoriu' })}
-            className="input-field"
-            placeholder="ex: 0721234567"
-            type="tel"
-          />
-          {errors.telefon && <p className="text-red-500 text-xs mt-1">{errors.telefon.message}</p>}
+          <input {...form1.register('telefon', { required: 'Telefonul este obligatoriu' })}
+            className="input-field" placeholder="ex: 0721234567" type="tel" />
+          {form1.formState.errors.telefon && <p className="text-red-500 text-xs mt-1">{form1.formState.errors.telefon.message}</p>}
         </div>
-
         <div className="sm:col-span-2">
           <label className="label">Adresa de domiciliu *</label>
-          <input
-            {...register('adresa_domiciliu', { required: 'Adresa este obligatorie' })}
-            className="input-field"
-            placeholder="ex: Str. Florilor nr. 5, ap. 2, sector 3, Bucuresti"
-          />
-          {errors.adresa_domiciliu && <p className="text-red-500 text-xs mt-1">{errors.adresa_domiciliu.message}</p>}
+          <input {...form1.register('adresa_domiciliu', { required: 'Adresa este obligatorie' })}
+            className="input-field" placeholder="ex: Str. Florilor nr. 5, ap. 2, sector 3, București" />
+          {form1.formState.errors.adresa_domiciliu && <p className="text-red-500 text-xs mt-1">{form1.formState.errors.adresa_domiciliu.message}</p>}
         </div>
-
         <div className="sm:col-span-2">
           <label className="label">Adresa email *</label>
-          <input
-            {...register('email', {
-              required: 'Email-ul este obligatoriu',
-              pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Email invalid' },
-            })}
-            className="input-field"
-            placeholder="ex: client@email.com"
-            type="email"
-          />
-          {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
+          <input {...form1.register('email', {
+            required: 'Email-ul este obligatoriu',
+            pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Email invalid' },
+          })} className="input-field" placeholder="ex: client@email.com" type="email" />
+          {form1.formState.errors.email && <p className="text-red-500 text-xs mt-1">{form1.formState.errors.email.message}</p>}
         </div>
       </div>
+
+      {/* ── Co-proprietar toggle ── */}
+      <label className="flex items-center gap-3 cursor-pointer select-none mb-6 p-3 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors">
+        <input
+          type="checkbox"
+          className="w-4 h-4 accent-blue-600"
+          checked={hasCoproprietar}
+          onChange={(e) => setHasCoproprietar(e.target.checked)}
+        />
+        <Users className="w-4 h-4 text-gray-500" />
+        <span className="text-sm font-medium text-gray-700">Co-proprietar (semnează împreună)</span>
+      </label>
+
+      {/* ── Client 2 ── */}
+      {hasCoproprietar && (
+        <div className="border border-blue-200 rounded-xl p-4 mb-6 bg-blue-50/30">
+          <p className="text-sm font-semibold text-blue-700 mb-4">Date co-proprietar</p>
+
+          <ClientOCRBox
+            loading={ocr2Loading}
+            previewUrl={preview2}
+            onFile={(f) => runOCR(f, form2.setValue, setPreview2, setOcr2Loading)}
+            onClearPreview={() => setPreview2(null)}
+          />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="label">Nume *</label>
+              <input {...form2.register('nume', { required: hasCoproprietar ? 'Numele este obligatoriu' : false })}
+                className="input-field" placeholder="ex: IONESCU" />
+              {form2.formState.errors.nume && <p className="text-red-500 text-xs mt-1">{form2.formState.errors.nume.message}</p>}
+            </div>
+            <div>
+              <label className="label">Prenume *</label>
+              <input {...form2.register('prenume', { required: hasCoproprietar ? 'Prenumele este obligatoriu' : false })}
+                className="input-field" placeholder="ex: MARIA" />
+              {form2.formState.errors.prenume && <p className="text-red-500 text-xs mt-1">{form2.formState.errors.prenume.message}</p>}
+            </div>
+            <div>
+              <label className="label">Serie buletin *</label>
+              <input {...form2.register('serie_buletin', { required: hasCoproprietar ? 'Seria este obligatorie' : false })}
+                className="input-field" placeholder="ex: IF" maxLength={2} />
+              {form2.formState.errors.serie_buletin && <p className="text-red-500 text-xs mt-1">{form2.formState.errors.serie_buletin.message}</p>}
+            </div>
+            <div>
+              <label className="label">Nr. buletin *</label>
+              <input {...form2.register('nr_buletin', { required: hasCoproprietar ? 'Numărul este obligatoriu' : false })}
+                className="input-field" placeholder="ex: 654321" maxLength={6} />
+              {form2.formState.errors.nr_buletin && <p className="text-red-500 text-xs mt-1">{form2.formState.errors.nr_buletin.message}</p>}
+            </div>
+            <div>
+              <label className="label">CNP *</label>
+              <input {...form2.register('cnp', {
+                required: hasCoproprietar ? 'CNP-ul este obligatoriu' : false,
+                pattern: { value: /^\d{13}$/, message: 'CNP invalid (13 cifre)' },
+              })} className="input-field" placeholder="ex: 2900101123456" maxLength={13} />
+              {form2.formState.errors.cnp && <p className="text-red-500 text-xs mt-1">{form2.formState.errors.cnp.message}</p>}
+            </div>
+            <div>
+              <label className="label">Nr. telefon</label>
+              <input {...form2.register('telefon')}
+                className="input-field" placeholder="ex: 0721234567" type="tel" />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="label">Adresa de domiciliu *</label>
+              <input {...form2.register('adresa_domiciliu', { required: hasCoproprietar ? 'Adresa este obligatorie' : false })}
+                className="input-field" placeholder="ex: Str. Florilor nr. 5, ap. 2, sector 3, București" />
+              {form2.formState.errors.adresa_domiciliu && <p className="text-red-500 text-xs mt-1">{form2.formState.errors.adresa_domiciliu.message}</p>}
+            </div>
+            <div className="sm:col-span-2">
+              <label className="label">Adresa email</label>
+              <input {...form2.register('email', {
+                pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Email invalid' },
+              })} className="input-field" placeholder="ex: client2@email.com" type="email" />
+              {form2.formState.errors.email && <p className="text-red-500 text-xs mt-1">{form2.formState.errors.email.message}</p>}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex justify-between">
         <button
@@ -295,7 +325,7 @@ export default function StepClientData({ data, onUpdate, onNext, onBack }: Props
           className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-sm font-semibold transition-all"
         >
           <ArrowLeft className="w-4 h-4" />
-          Inapoi
+          Înapoi
         </button>
         <button
           type="submit"

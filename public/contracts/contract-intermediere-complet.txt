@@ -1,4 +1,4 @@
-CONTRACT DE INTERMEDIERE IMOBILIARĂ – REPREZENTARE EXCLUSIVĂ
+CONTRACT DE INTERMEDIERE IMOBILIARĂ – REPREZENTARE SIMPLA (NEEXCLUSIVĂ)
 Nr. {{NR_CONTRACT}} Data semnării: {{DATA_SEMNARE}} Data incepere aplicare {{DATA_INCEPERE}}
 
 Art. 1 PARTILE CONTRACTANTE
@@ -50,10 +50,6 @@ comunicare scrisă, în format hârtie sau electronic (email, sms, whatsapp, mes
 (2) agentia a efectuat o vizionare a Imobilului alături de terț;
 (3) agentia a oferit Clientului în scris (email, sms, whatsapp, messenger, etc.) datele de contact ale terțului.
 2.7. Agenţia nu prestează şi nu intermediază servicii tehnice (cadastrale, economice, juridice).
-2.8. Clientul acordă Agentului Imobiliar dreptul exclusiv de a intermedia vânzarea imobilului descris în prezentul
-contract, pe durata prevăzută la pt. 2.6.
-2.9. Clientul nu poate apela la serviciile altei agenții imobiliare sau ale altui intermediar și nici nu poate încheia
-tranzacția prin mijloace proprii, fără participarea Agentiei, pe perioada valabilității contractului.
 Art. 3 DECLARAŢII ŞI CLARIFICĂRI
 3.1 Subsemnatul(a)/subsemnaţii {{PRENUME_CLIENT}} {{NUME_CLIENT}}
 declar(ăm) că înainte de semnarea prezentului Contract, am primit de la Agenţie următoarele:
@@ -64,14 +60,12 @@ observaţii;
 ✓ {{CLARIFICARI}}
 Art. 4 DREPTURILE SI OBLIGATIILE PARTILOR
 4.1 Agenţia se obligă:
-
-
-1)
-
-să desfășoare activități de promovare a proprietății ce face obiectul prezentului contract, prin mijloace proprii
+1) să desfășoare activități de promovare a proprietății ce face obiectul prezentului contract, prin mijloace proprii
 și pe canalele de publicitate pe care le consideră adecvate;
 2) să prezinte potențialilor clienți informații corecte, conforme cu cele furnizate de Client, fără omisiuni sau
 denaturări, respectând principiile bunei-credințe și ale transparenței în activitatea de intermediere;
+
+
 3) să notifice Clientul, în timp util, cu privire la orice demers relevant întreprins în baza prezentului contract,
 inclusiv programarea de vizionări, interesul manifestat de terți și eventuale oferte de tranzacționare;
 4) să asigure reprezentarea/asistarea a Clientului în vederea încheierii tranzacţiei;
@@ -87,27 +81,24 @@ proprietate asupra imobilului, situația juridică a acestuia, precum și orice 
 în vederea promovării și intermedierii tranzacției;
 2) să colaboreze cu Agenția în mod activ și loial, facilitând accesul acesteia și al potențialilor clienți la imobil
 pentru realizarea vizionărilor, evaluărilor și altor activități necesare procesului de tranzacționare;
-3) să nu încheie direct sau prin terți alte contracte de intermediere pentru același imobil;
-4) să informeze Agenția în scris, în termen de maximum 3 (trei) zile lucrătoare, despre încheierea unei tranzacții
+3) să informeze Agenția în scris, în termen de maximum 3 (trei) zile lucrătoare, despre încheierea unei tranzacții
 de vânzare sau închiriere a imobilului ce face obiectul prezentului contract, indiferent dacă aceasta s-a
 realizat prin intermediul Agenției sau prin altă modalitate; să transmită Agenției o fotocopie a tranzacției;
-5) să achite Agenției comisionul convenit prin prezentul contract, în condițiile și la termenele stabilite, în cazul
+4) să achite Agenției comisionul convenit prin prezentul contract, în condițiile și la termenele stabilite, în cazul
 în care tranzacția se încheie cu un client prezentat de Agenție în perioada de valabilitate a contractului sau
 în termenul de protecție;
-6) să respecte toate prevederile prezentului contract, inclusiv cele referitoare la durată și încetare, fără a
+5) să respecte toate prevederile prezentului contract, inclusiv cele referitoare la durată și încetare, fără a
 întreprinde acțiuni care ar putea prejudicia activitatea de intermediere desfășurată de Agenție;
-7) să comunice Agenției, în maxim 3 zile lucrătoare, orice modificare privind prețul de vânzare, condițiile
+6) să comunice Agenției, în maxim 3 zile lucrătoare, orice modificare privind prețul de vânzare, condițiile
 tranzacției, disponibilitatea proprietății sau alte elemente esențiale ce pot influența desfășurarea mandatului.
 Art. 5 CONDIȚII FINANCIARE
 5.1 Pentru serviciile de intermediere prestate, Clientul se obligă să achite Agenției un comision în cuantum de {{COMISION}}% din prețul de vânzare al proprietății, comision calculat la valoarea totală convenită prin actul de înstrăinare.
 5.2 Clientul nu datoreaza Comision si rambursarea cheltuielilor de promovare când Contractul încetează prin
 ajungere la termen, fără a exclude aplicarea art. 5.3 (2) din Contract.
 5.3 Comisionul este scadent şi trebuie achitat, integral, în cuantumul prevazut la art. 5.1, de către Client:
-(1) in cazul în care Clientul încheie tranzacția fără participarea Agentiei sau prin intermediul unei alte agenții
-imobiliare ori tert intermediar, pe perioada de valabilitate a reprezentării exclusive;
-(2) dacă imobilul din Ofertă a făcut obiect al unei înţelegeri agreată de Client pe durata de valabilitate a
+(1) dacă imobilul din Ofertă a făcut obiect al unei înţelegeri agreată de Client pe durata de valabilitate a
 prezentului Contract, cu un terț identificat de Agenție;
-(3) în cazul în care Clientul încheie o tranzacție de vânzare cu un terț identificat de Agenție, dar semnarea
+(2) în cazul în care Clientul încheie o tranzacție de vânzare cu un terț identificat de Agenție, dar semnarea
 contractului de vânzare-cumpărare are loc după expirarea sau încetarea contractului.
 5.4 În cazul în care Agentia reușește să vândă Proprietatea la un preț superior celui convenit inițial de Părți, astfel
 cum a fost indicat la art. 2.4, Clientul va achita Agentiei un comision suplimentar denumit „Comision de Succes”,
@@ -123,13 +114,7 @@ de Agenție.
 5.8 În situația în care Clientul nu invită Agenţia la semnarea convenţiei sau nu comunică Agenţiei o copie a convenţiei
 conform art. 4.2 pct. 3) din Contract, Agenţia este îndreptăţită să calculeze Comisionul în raport de valoarea stipulată
 la art. 2.4.
-5.9 În cazul în care Clientul revocă unilateral Oferta, după ce Agenția a efectuat investiții și a depus eforturi în
-promovarea acesteia, Clientul are obligația de a rambursa cheltuielile aferente. Deoarece evaluarea individuală a
-acestor costuri pentru activitățile de promovare și reprezentare/asistare desfășurate în baza prezentului Contract
-este dificil de realizat, Părțile stabilesc de comun acord un cuantum fix al acestor cheltuieli, în valoare de {{CHELTUIELI_LUNARE}} lei/lună.
 Art. 6 RASPUNDERE CONTRACTUALĂ
-
-
 6.1 Prezentul capitol reglementează condiţiile în care răspund părţile pentru neexecutarea obligaţiilor derivate din
 prezentul Contract.
 6.2 Depăşirea cu mai mult de 3 zile lucrătoare a termenului de plată, inclusiv în situaţia plăţii parţiale, atrage obligaţia
@@ -140,6 +125,8 @@ ajunge să fie obligată să restituie un Comision în toate situaţiile în car
 imobiliară în sensul arătat la art.2 din Contract:
 (1) Clientul nu îşi respectă obligaţiile faţă de Terţ sau,
 (2) atunci când Terţul nu-şi respectă propriile obligaţii, iar Clientul nu insistă în finalizarea tranzacţiei.
+
+
 Art. 7 ÎNCETAREA CONTRACTULUI
 7.1 Prezentul Contract încetează de drept:
 (1) la expirarea duratei pentru care a fost încheiat, fără a fi necesară vreo notificare prealabilă între părți;

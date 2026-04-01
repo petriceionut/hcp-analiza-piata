@@ -22,9 +22,15 @@ const STEPS = [
 export interface WizardData {
   tipContract?: ContractType
   clientData?: Partial<ClientData>
+  clientData2?: Partial<ClientData>
   propertyData?: Partial<PropertyData>
   durata?: number
+  dataIncepere?: string
   comision?: number
+  viciiCunoscute?: string
+  pretMinim?: number
+  clarificari?: string
+  cheltuieliLunare?: number
   derogari?: string
 }
 

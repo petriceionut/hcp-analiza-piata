@@ -59,6 +59,7 @@ export const PROPERTY_ICONS: Record<PropertyType, string> = {
 export const CONTRACT_STATUS_LABELS: Record<string, string> = {
   draft: 'Ciorn\u0103',
   trimis_client: 'Trimis clientului',
+  vizualizat_client: 'Vizualizat de client',
   semnat_client: 'Semnat de client',
   semnat_ambele: 'Semnat de ambele p\u0103r\u021bi',
   finalizat: 'Finalizat',
@@ -67,6 +68,7 @@ export const CONTRACT_STATUS_LABELS: Record<string, string> = {
 export const CONTRACT_STATUS_COLORS: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-700',
   trimis_client: 'bg-yellow-100 text-yellow-700',
+  vizualizat_client: 'bg-orange-100 text-orange-700',
   semnat_client: 'bg-blue-100 text-blue-700',
   semnat_ambele: 'bg-green-100 text-green-700',
   finalizat: 'bg-green-100 text-green-700',
