@@ -170,23 +170,26 @@ export default function ContractPreviewContent({
   const isArticleHeader = (block: string) =>
     /^(Art\.|ART\.)/.test(block.trim())
 
-  const isDocHeader = (block: string, idx: number) => idx === 0
+  const isDocHeader = (_block: string, idx: number) => idx === 0
 
   return (
     <div className="contract-preview font-serif text-gray-900">
       {/* Contract body */}
-      <div className="mb-10 space-y-0">
+      <div
+        className="mx-auto mb-10"
+        style={{ maxWidth: 800, paddingLeft: 40, paddingRight: 40 }}
+      >
         {blocks.map((block, idx) => (
           <p
             key={idx}
-            className={[
-              'whitespace-pre-wrap text-[13px] leading-[1.75]',
-              isDocHeader(block, idx)
-                ? 'text-center font-semibold text-base mb-4'
-                : isArticleHeader(block)
-                ? 'mt-5 mb-1 font-semibold'
-                : 'mb-3',
-            ].join(' ')}
+            className="whitespace-pre-wrap text-[13px]"
+            style={{
+              lineHeight: 1.6,
+              textAlign: isDocHeader(block, idx) ? 'center' : 'justify',
+              fontWeight: isDocHeader(block, idx) || isArticleHeader(block) ? 600 : 400,
+              marginTop: isArticleHeader(block) ? 16 : 0,
+              marginBottom: 8,
+            }}
           >
             {block}
           </p>
