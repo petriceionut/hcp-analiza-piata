@@ -163,37 +163,52 @@ export default function ContractPreviewContent({
     )
   }
 
-  // Split on one-or-more blank lines to get paragraphs/articles.
-  // Within each block, internal line breaks are preserved via whitespace-pre-wrap.
-  const blocks = contractText.split(/\n{2,}/).filter((b) => b.trim())
+  // Split into lines, then group consecutive non-empty lines into paragraphs
+  // separated by blank lines. This lets the browser reflow text naturally
+  // (no whitespace:pre-wrap) while still preserving the logical block structure.
+  type Block = { lines: string[]; isBlank: false } | { lines: []; isBlank: true }
+  const blocks: { lines: string[]; idx: number }[] = []
+  let current: string[] = []
+  for (const line of contractText.split('\n')) {
+    if (line.trim() === '') {
+      if (current.length) { blocks.push({ lines: current, idx: blocks.length }); current = [] }
+    } else {
+      current.push(line)
+    }
+  }
+  if (current.length) blocks.push({ lines: current, idx: blocks.length })
 
-  const isArticleHeader = (block: string) =>
-    /^(Art\.|ART\.)/.test(block.trim())
-
-  const isDocHeader = (_block: string, idx: number) => idx === 0
+  const isArticleHeader = (lines: string[]) => /^(Art\.|ART\.)/.test(lines[0]?.trim() ?? '')
+  const isDocHeader     = (idx: number)     => idx === 0
 
   return (
     <div className="contract-preview font-serif text-gray-900">
-      {/* Contract body */}
-      <div
-        className="mx-auto mb-10"
-        style={{ maxWidth: 800, paddingLeft: 40, paddingRight: 40 }}
-      >
-        {blocks.map((block, idx) => (
-          <p
-            key={idx}
-            className="whitespace-pre-wrap text-[13px]"
-            style={{
-              lineHeight: 1.6,
-              textAlign: isDocHeader(block, idx) ? 'center' : 'justify',
-              fontWeight: isDocHeader(block, idx) || isArticleHeader(block) ? 600 : 400,
-              marginTop: isArticleHeader(block) ? 16 : 0,
-              marginBottom: 8,
-            }}
-          >
-            {block}
-          </p>
-        ))}
+      {/* Contract body — full width, justified, browser reflows text naturally */}
+      <div className="w-full mb-10" style={{ paddingLeft: 24, paddingRight: 24 }}>
+        {blocks.map(({ lines, idx }) => {
+          const artHeader = isArticleHeader(lines)
+          const docHeader = isDocHeader(idx)
+          return (
+            <p
+              key={idx}
+              style={{
+                textAlign: docHeader ? 'center' : 'justify',
+                fontWeight: docHeader || artHeader ? 600 : 400,
+                lineHeight: 1.6,
+                fontSize: 13,
+                marginTop: artHeader ? 16 : 0,
+                marginBottom: 8,
+              }}
+            >
+              {lines.map((line, li) => (
+                <span key={li}>
+                  {line}
+                  {li < lines.length - 1 && <br />}
+                </span>
+              ))}
+            </p>
+          )
+        })}
       </div>
 
       {/* Signatures */}
