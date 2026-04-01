@@ -79,7 +79,11 @@ export default function StepPreview({ data, onBack }: Props) {
         body: JSON.stringify(data),
       })
 
-      if (!saveRes.ok) throw new Error('Failed to save contract')
+      if (!saveRes.ok) {
+        const saveErr = await saveRes.json().catch(() => ({ error: `HTTP ${saveRes.status}` }))
+        console.error('[StepPreview] Save failed:', saveErr)
+        throw new Error(saveErr?.detail ?? saveErr?.error ?? `Failed to save contract (${saveRes.status})`)
+      }
       const { id: contractId } = await saveRes.json()
 
       // 3. Send to SignWell (generates signing link and emails client)
