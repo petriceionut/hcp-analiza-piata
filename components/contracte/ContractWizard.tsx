@@ -5,6 +5,7 @@ import { ContractType, ClientData, PropertyData } from '@/types'
 import StepSelectType from './steps/StepSelectType'
 import StepClientData from './steps/StepClientData'
 import StepPropertyData from './steps/StepPropertyData'
+import StepConditii from './steps/StepConditii'
 import StepDerogari from './steps/StepDerogari'
 import StepPreview from './steps/StepPreview'
 import { CheckCircle } from 'lucide-react'
@@ -13,14 +14,17 @@ const STEPS = [
   { id: 1, label: 'Tip contract' },
   { id: 2, label: 'Date client' },
   { id: 3, label: 'Date imobil' },
-  { id: 4, label: 'Derogari' },
-  { id: 5, label: 'Preview & Trimite' },
+  { id: 4, label: 'Condiții contract' },
+  { id: 5, label: 'Derogari' },
+  { id: 6, label: 'Preview & Trimite' },
 ]
 
 export interface WizardData {
   tipContract?: ContractType
   clientData?: Partial<ClientData>
   propertyData?: Partial<PropertyData>
+  durata?: number
+  comision?: number
   derogari?: string
 }
 
@@ -104,7 +108,7 @@ export default function ContractWizard() {
           />
         )}
         {currentStep === 4 && (
-          <StepDerogari
+          <StepConditii
             data={data}
             onUpdate={updateData}
             onNext={next}
@@ -112,6 +116,14 @@ export default function ContractWizard() {
           />
         )}
         {currentStep === 5 && (
+          <StepDerogari
+            data={data}
+            onUpdate={updateData}
+            onNext={next}
+            onBack={back}
+          />
+        )}
+        {currentStep === 6 && (
           <StepPreview
             data={data}
             onBack={back}
