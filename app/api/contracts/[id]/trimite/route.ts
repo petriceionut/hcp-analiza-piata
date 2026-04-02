@@ -34,8 +34,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const swRes = await fetch('https://www.signwell.com/api/v1/documents/', {
       method: 'POST',
       headers: {
-        'X-Api-Token': apiKey,
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify(payload),
     });
