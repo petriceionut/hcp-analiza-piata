@@ -1,24 +1,20 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { DealRoom, DealRoomDocument, Buyer, Offer, OfferStatus } from '@/types'
-import { formatCurrency, formatDateTime, generateToken } from '@/lib/utils'
+import { useState } from 'react'
+import { DealRoom, DealRoomDocument, Buyer, Offer } from '@/types'
+import { formatDate, formatCurrency, formatDateTime } from '@/lib/utils'
 import {
   Upload,
-  Loader2,
-  Trash2,
-  Copy,
-  Check,
   UserPlus,
   FileText,
   Users,
-  TrendingUp,
-  ExternalLink,
+  Euro,
   CheckCircle,
-  XCircle,
   Clock,
-  Download,
+  Loader2,
+  ExternalLink,
+  Copy,
+  X,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -31,600 +27,319 @@ interface Props {
 
 type Tab = 'documente' | 'cumparatori' | 'oferte'
 
-const offerStatusConfig: Record<
-  OfferStatus,
-  { label: string; color: string; icon: React.ReactNode }
-> = {
-  in_asteptare: {
-    label: 'În așteptare',
-    color: 'bg-amber-100 text-amber-700',
-    icon: <Clock className="w-3 h-3" />,
-  },
-  acceptata: {
-    label: 'Acceptată',
-    color: 'bg-green-100 text-green-700',
-    icon: <CheckCircle className="w-3 h-3" />,
-  },
-  respinsa: {
-    label: 'Respinsă',
-    color: 'bg-red-100 text-red-700',
-    icon: <XCircle className="w-3 h-3" />,
-  },
-}
-
 export default function DealRoomAgentDashboard({
   dealroom,
-  documente: initialDocumente,
-  cumparatori: initialCumparatori,
-  oferte: initialOferte,
+  documente: initialDocs,
+  cumparatori: initialBuyers,
+  oferte: initialOffers,
 }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('documente')
-  const [documente, setDocumente] = useState(initialDocumente)
-  const [cumparatori, setCumparatori] = useState(initialCumparatori)
-  const [oferte, setOferte] = useState(initialOferte)
-
-  // Document upload
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [docs, setDocs] = useState(initialDocs)
+  const [buyers, setBuyers] = useState(initialBuyers)
+  const [offers, setOffers] = useState(initialOffers)
   const [uploading, setUploading] = useState(false)
-
-  // Add buyer form
   const [showAddBuyer, setShowAddBuyer] = useState(false)
-  const [buyerNume, setBuyerNume] = useState('')
-  const [buyerPrenume, setBuyerPrenume] = useState('')
-  const [buyerTelefon, setBuyerTelefon] = useState('')
-  const [buyerEmail, setBuyerEmail] = useState('')
+  const [buyerForm, setBuyerForm] = useState({ nume: '', prenume: '', telefon: '', email: '' })
   const [addingBuyer, setAddingBuyer] = useState(false)
+  const [confirmingOffer, setConfirmingOffer] = useState<string | null>(null)
 
-  // Copied state per token
-  const [copiedId, setCopiedId] = useState<string | null>(null)
-
-  // Offer actions
-  const [processingOfferId, setProcessingOfferId] = useState<string | null>(null)
-
-  const supabase = createClient()
-  const appUrl =
-    typeof window !== 'undefined'
-      ? window.location.origin
-      : process.env.NEXT_PUBLIC_APP_URL ?? ''
-
-  // ─── Documents ────────────────────────────────────────────────────────────
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUploadDoc = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    e.target.value = ''
 
     setUploading(true)
     try {
-      const filePath = `dealroom/${dealroom.id}/${Date.now()}_${file.name}`
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('dealroom_id', dealroom.id)
 
-      const { error: storageError } = await supabase.storage
-        .from('dealroom-docs')
-        .upload(filePath, file)
+      const res = await fetch(`/api/dealroom/${dealroom.id}/documente`, {
+        method: 'POST',
+        body: formData,
+      })
 
-      if (storageError) throw storageError
+      if (!res.ok) throw new Error()
 
-      const { data: urlData } = supabase.storage
-        .from('dealroom-docs')
-        .getPublicUrl(filePath)
-
-      const { data: doc, error: dbError } = await supabase
-        .from('dealroom_documents')
-        .insert({
-          dealroom_id: dealroom.id,
-          nume: file.name,
-          url: urlData.publicUrl,
-          tip: file.type,
-        })
-        .select()
-        .single()
-
-      if (dbError) throw dbError
-
-      setDocumente((prev) => [doc as DealRoomDocument, ...prev])
-      toast.success('Document încărcat cu succes!')
-    } catch (err) {
-      console.error(err)
-      toast.error('Eroare la încărcarea documentului.')
+      const newDoc = await res.json()
+      setDocs((prev) => [newDoc, ...prev])
+      toast.success('Document incarcat cu succes!')
+    } catch {
+      toast.error('Eroare la incarcarea documentului')
     } finally {
       setUploading(false)
+      e.target.value = ''
     }
   }
-
-  const handleDeleteDocument = async (doc: DealRoomDocument) => {
-    if (!confirm(`Ștergi documentul "${doc.nume}"?`)) return
-
-    try {
-      const { error } = await supabase
-        .from('dealroom_documents')
-        .delete()
-        .eq('id', doc.id)
-
-      if (error) throw error
-
-      setDocumente((prev) => prev.filter((d) => d.id !== doc.id))
-      toast.success('Document șters.')
-    } catch {
-      toast.error('Eroare la ștergere.')
-    }
-  }
-
-  // ─── Buyers ───────────────────────────────────────────────────────────────
 
   const handleAddBuyer = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!buyerNume || !buyerPrenume || !buyerTelefon) {
-      toast.error('Completați toate câmpurile obligatorii.')
-      return
-    }
-
     setAddingBuyer(true)
     try {
-      const token = generateToken()
+      const res = await fetch(`/api/dealroom/${dealroom.id}/cumparatori`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...buyerForm, dealroom_id: dealroom.id }),
+      })
 
-      const { data: buyer, error } = await supabase
-        .from('buyers')
-        .insert({
-          dealroom_id: dealroom.id,
-          nume: buyerNume,
-          prenume: buyerPrenume,
-          telefon: buyerTelefon,
-          email: buyerEmail || null,
-          token,
-        })
-        .select()
-        .single()
+      if (!res.ok) throw new Error()
 
-      if (error) throw error
-
-      setCumparatori((prev) => [buyer as Buyer, ...prev])
-      setBuyerNume('')
-      setBuyerPrenume('')
-      setBuyerTelefon('')
-      setBuyerEmail('')
+      const newBuyer = await res.json()
+      setBuyers((prev) => [newBuyer, ...prev])
+      setBuyerForm({ nume: '', prenume: '', telefon: '', email: '' })
       setShowAddBuyer(false)
-      toast.success('Cumpărător adăugat!')
+      toast.success(`${buyerForm.prenume} ${buyerForm.nume} adaugat! Link trimis pe WhatsApp.`)
     } catch {
-      toast.error('Eroare la adăugarea cumpărătorului.')
+      toast.error('Eroare la adaugarea cumparatorului')
     } finally {
       setAddingBuyer(false)
     }
   }
 
-  const copyInviteLink = async (token: string) => {
-    const link = `${appUrl}/dealroom-client/${token}`
-    await navigator.clipboard.writeText(link)
-    setCopiedId(token)
-    toast.success('Link copiat!')
-    setTimeout(() => setCopiedId(null), 2000)
-  }
-
-  const handleDeleteBuyer = async (buyer: Buyer) => {
-    if (!confirm(`Ștergi cumpărătorul ${buyer.prenume} ${buyer.nume}?`)) return
-
+  const handleConfirmOffer = async (offerId: string) => {
+    setConfirmingOffer(offerId)
     try {
-      const { error } = await supabase.from('buyers').delete().eq('id', buyer.id)
-      if (error) throw error
-      setCumparatori((prev) => prev.filter((b) => b.id !== buyer.id))
-      toast.success('Cumpărător șters.')
-    } catch {
-      toast.error('Eroare la ștergere.')
-    }
-  }
+      const res = await fetch(`/api/dealroom/${dealroom.id}/oferte/${offerId}/confirma`, {
+        method: 'POST',
+      })
 
-  // ─── Offers ───────────────────────────────────────────────────────────────
+      if (!res.ok) throw new Error()
 
-  const handleOfferAction = async (offerId: string, action: 'acceptata' | 'respinsa') => {
-    setProcessingOfferId(offerId)
-    try {
-      const { error } = await supabase
-        .from('offers')
-        .update({ status: action })
-        .eq('id', offerId)
-
-      if (error) throw error
-
-      setOferte((prev) =>
-        prev.map((o) => (o.id === offerId ? { ...o, status: action } : o))
+      setOffers((prev) =>
+        prev.map((o) =>
+          o.id === offerId ? { ...o, status: 'acceptata' as const } : o
+        )
       )
-
-      if (action === 'acceptata') {
-        // Update dealroom status
-        await supabase
-          .from('dealrooms')
-          .update({ status: 'oferta_acceptata' })
-          .eq('id', dealroom.id)
-
-        toast.success('Ofertă acceptată! DealRoom marcat ca finalizat.')
-      } else {
-        toast.success('Ofertă respinsă.')
-      }
+      toast.success('Oferta confirmata! DealRoom-ul a fost inchis.')
     } catch {
-      toast.error('Eroare la procesarea ofertei.')
+      toast.error('Eroare la confirmarea ofertei')
     } finally {
-      setProcessingOfferId(null)
+      setConfirmingOffer(null)
     }
   }
 
-  // ─── Tabs ─────────────────────────────────────────────────────────────────
+  const copyBuyerLink = (token: string) => {
+    const url = `${window.location.origin}/dealroom-client/${token}`
+    navigator.clipboard.writeText(url)
+    toast.success('Link copiat!')
+  }
 
-  const tabs: { id: Tab; label: string; count: number; icon: React.ReactNode }[] = [
-    {
-      id: 'documente',
-      label: 'Documente',
-      count: documente.length,
-      icon: <FileText className="w-4 h-4" />,
-    },
-    {
-      id: 'cumparatori',
-      label: 'Cumpărători',
-      count: cumparatori.length,
-      icon: <Users className="w-4 h-4" />,
-    },
-    {
-      id: 'oferte',
-      label: 'Oferte',
-      count: oferte.length,
-      icon: <TrendingUp className="w-4 h-4" />,
-    },
+  const tabs: { id: Tab; label: string; count: number; icon: React.ElementType }[] = [
+    { id: 'documente', label: 'Documente', count: docs.length, icon: FileText },
+    { id: 'cumparatori', label: 'Cumparatori', count: buyers.length, icon: Users },
+    { id: 'oferte', label: 'Oferte', count: offers.length, icon: Euro },
   ]
 
   return (
-    <div className="space-y-6">
-      {/* Stats row */}
-      <div className="grid grid-cols-3 gap-4">
-        {tabs.map((tab) => (
-          <div
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 cursor-pointer hover:border-blue-200 transition-all"
-          >
-            <div className="flex items-center gap-2 text-slate-400 mb-2">{tab.icon}</div>
-            <p className="text-2xl font-bold text-slate-900">{tab.count}</p>
-            <p className="text-sm text-slate-500">{tab.label}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Tab bar */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="flex border-b border-gray-100">
-          {tabs.map((tab) => (
+    <div>
+      {/* Tabs */}
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-6 w-fit">
+        {tabs.map((tab) => {
+          const Icon = tab.icon
+          return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-6 py-4 text-sm font-medium transition-colors border-b-2 ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 activeTab === tab.id
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
               }`}
             >
-              {tab.icon}
+              <Icon className="w-4 h-4" />
               {tab.label}
-              <span
-                className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
-                  activeTab === tab.id
-                    ? 'bg-blue-100 text-blue-600'
-                    : 'bg-gray-100 text-gray-500'
-                }`}
-              >
+              <span className={`badge text-xs px-1.5 py-0.5 ${
+                activeTab === tab.id ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'
+              }`}>
                 {tab.count}
               </span>
             </button>
-          ))}
-        </div>
-
-        <div className="p-6">
-          {/* ── Documents Tab ── */}
-          {activeTab === 'documente' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-slate-500">
-                  Documentele sunt vizibile tuturor cumpărătorilor invitați.
-                </p>
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-lg text-sm font-semibold transition-colors"
-                >
-                  {uploading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Upload className="w-4 h-4" />
-                  )}
-                  {uploading ? 'Se încarcă...' : 'Adaugă document'}
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*,application/pdf,.doc,.docx"
-                  className="hidden"
-                  onChange={handleFileUpload}
-                />
-              </div>
-
-              {documente.length === 0 ? (
-                <div className="text-center py-12 text-slate-400">
-                  <FileText className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                  <p className="text-sm">Niciun document încărcat</p>
-                  <p className="text-xs mt-1">
-                    Adaugă documente pentru a le face disponibile cumpărătorilor
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {documente.map((doc) => (
-                    <div
-                      key={doc.id}
-                      className="flex items-center justify-between p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center shrink-0">
-                          <FileText className="w-4 h-4 text-blue-600" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-slate-900 truncate">{doc.nume}</p>
-                          <p className="text-xs text-slate-400">
-                            {formatDateTime(doc.uploaded_at)}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0 ml-2">
-                        <a
-                          href={doc.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-2 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
-                        >
-                          <Download className="w-4 h-4" />
-                        </a>
-                        <button
-                          onClick={() => handleDeleteDocument(doc)}
-                          className="p-2 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── Buyers Tab ── */}
-          {activeTab === 'cumparatori' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-slate-500">
-                  Fiecare cumpărător primește un link unic de acces.
-                </p>
-                <button
-                  onClick={() => setShowAddBuyer(!showAddBuyer)}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors"
-                >
-                  <UserPlus className="w-4 h-4" />
-                  Adaugă cumpărător
-                </button>
-              </div>
-
-              {showAddBuyer && (
-                <form
-                  onSubmit={handleAddBuyer}
-                  className="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-3"
-                >
-                  <p className="text-sm font-semibold text-blue-700">Date cumpărător</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="label">Prenume *</label>
-                      <input
-                        value={buyerPrenume}
-                        onChange={(e) => setBuyerPrenume(e.target.value)}
-                        className="input-field"
-                        placeholder="Ion"
-                      />
-                    </div>
-                    <div>
-                      <label className="label">Nume *</label>
-                      <input
-                        value={buyerNume}
-                        onChange={(e) => setBuyerNume(e.target.value)}
-                        className="input-field"
-                        placeholder="Popescu"
-                      />
-                    </div>
-                    <div>
-                      <label className="label">Telefon *</label>
-                      <input
-                        value={buyerTelefon}
-                        onChange={(e) => setBuyerTelefon(e.target.value)}
-                        className="input-field"
-                        placeholder="0721234567"
-                        type="tel"
-                      />
-                    </div>
-                    <div>
-                      <label className="label">Email</label>
-                      <input
-                        value={buyerEmail}
-                        onChange={(e) => setBuyerEmail(e.target.value)}
-                        className="input-field"
-                        placeholder="email@exemplu.ro"
-                        type="email"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowAddBuyer(false)}
-                      className="btn-secondary text-sm"
-                    >
-                      Anulează
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={addingBuyer}
-                      className="btn-primary text-sm"
-                    >
-                      {addingBuyer ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <UserPlus className="w-4 h-4" />
-                      )}
-                      Salvează
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              {cumparatori.length === 0 ? (
-                <div className="text-center py-12 text-slate-400">
-                  <Users className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                  <p className="text-sm">Niciun cumpărător adăugat</p>
-                  <p className="text-xs mt-1">
-                    Adaugă cumpărători pentru a le trimite invitații
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {cumparatori.map((buyer) => (
-                    <div
-                      key={buyer.id}
-                      className="flex items-center justify-between p-3 bg-slate-50 rounded-xl"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-900">
-                          {buyer.prenume} {buyer.nume}
-                        </p>
-                        <p className="text-xs text-slate-400">{buyer.telefon}</p>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0 ml-2">
-                        <button
-                          onClick={() => copyInviteLink(buyer.token)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-white border border-gray-200 hover:border-blue-300 text-slate-600 hover:text-blue-600 rounded-lg transition-colors"
-                          title="Copiază link de acces"
-                        >
-                          {copiedId === buyer.token ? (
-                            <Check className="w-3.5 h-3.5 text-green-600" />
-                          ) : (
-                            <Copy className="w-3.5 h-3.5" />
-                          )}
-                          Link
-                        </button>
-                        <a
-                          href={`${appUrl}/dealroom-client/${buyer.token}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-2 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
-                        <button
-                          onClick={() => handleDeleteBuyer(buyer)}
-                          className="p-2 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── Offers Tab ── */}
-          {activeTab === 'oferte' && (
-            <div className="space-y-4">
-              {oferte.length === 0 ? (
-                <div className="text-center py-12 text-slate-400">
-                  <TrendingUp className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                  <p className="text-sm">Nicio ofertă primită</p>
-                  <p className="text-xs mt-1">
-                    Ofertele vor apărea aici după ce cumpărătorii le trimit
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {oferte
-                    .sort((a, b) => b.suma - a.suma)
-                    .map((offer, index) => {
-                      const statusCfg = offerStatusConfig[offer.status]
-                      const isProcessing = processingOfferId === offer.id
-                      const isPending = offer.status === 'in_asteptare'
-
-                      return (
-                        <div
-                          key={offer.id}
-                          className="p-4 bg-slate-50 rounded-xl border border-transparent hover:border-slate-200 transition-all"
-                        >
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center text-xs font-bold text-slate-600">
-                                #{index + 1}
-                              </div>
-                              <div>
-                                <p className="font-semibold text-slate-900">
-                                  {formatCurrency(offer.suma)}
-                                </p>
-                                <p className="text-xs text-slate-500">
-                                  {offer.buyer?.prenume} {offer.buyer?.nume} ·{' '}
-                                  {formatDateTime(offer.created_at)}
-                                </p>
-                              </div>
-                            </div>
-                            <span
-                              className={`badge flex items-center gap-1 ${statusCfg.color}`}
-                            >
-                              {statusCfg.icon}
-                              {statusCfg.label}
-                            </span>
-                          </div>
-
-                          {offer.mesaj && (
-                            <p className="text-sm text-slate-600 mt-2 pl-11 italic">
-                              "{offer.mesaj}"
-                            </p>
-                          )}
-
-                          {isPending && (
-                            <div className="flex gap-2 mt-3 pl-11">
-                              <button
-                                onClick={() => handleOfferAction(offer.id, 'acceptata')}
-                                disabled={isProcessing}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
-                              >
-                                {isProcessing ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                ) : (
-                                  <CheckCircle className="w-3.5 h-3.5" />
-                                )}
-                                Acceptă
-                              </button>
-                              <button
-                                onClick={() => handleOfferAction(offer.id, 'respinsa')}
-                                disabled={isProcessing}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-white border border-red-200 hover:bg-red-50 disabled:opacity-50 text-red-600 rounded-lg font-medium transition-colors"
-                              >
-                                {isProcessing ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                ) : (
-                                  <XCircle className="w-3.5 h-3.5" />
-                                )}
-                                Respinge
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+          )
+        })}
       </div>
+
+      {/* Documents tab */}
+      {activeTab === 'documente' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-700">Documente proprietate</h2>
+            <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors cursor-pointer">
+              {uploading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Upload className="w-4 h-4" />
+              )}
+              {uploading ? 'Se incarca...' : 'Incarca document'}
+              <input
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                className="hidden"
+                onChange={handleUploadDoc}
+                disabled={uploading}
+              />
+            </label>
+          </div>
+
+          {docs.length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-100 p-10 text-center">
+              <FileText className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+              <p className="text-sm text-gray-500">Niciun document incarcat</p>
+              <p className="text-xs text-gray-400 mt-1">Incarca extras CF, schite, releveu, etc.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {docs.map((doc) => (
+                <div key={doc.id} className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-4">
+                  <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <FileText className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-900 truncate">{doc.nume}</p>
+                    <p className="text-xs text-slate-400">{formatDate(doc.uploaded_at)}</p>
+                  </div>
+                  <a
+                    href={doc.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 transition-colors"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    Deschide
+                  </a>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Buyers tab */}
+      {activeTab === 'cumparatori' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-700">Cumparatori interesati</h2>
+            <button
+              onClick={() => setShowAddBuyer(true)}
+              disabled={dealroom.status === 'inchis'}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              <UserPlus className="w-4 h-4" />
+              Adauga cumparator
+            </button>
+          </div>
+
+          {showAddBuyer && (
+            <div className="bg-white rounded-xl border border-emerald-200 p-5 fade-in">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-slate-900">Cumparator nou</h3>
+                <button onClick={() => setShowAddBuyer(false)}>
+                  <X className="w-4 h-4 text-slate-400" />
+                </button>
+              </div>
+              <form onSubmit={handleAddBuyer} className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Prenume *</label>
+                  <input required value={buyerForm.prenume} onChange={(e) => setBuyerForm((p) => ({ ...p, prenume: e.target.value }))} className="input-field" placeholder="Ion" />
+                </div>
+                <div>
+                  <label className="label">Nume *</label>
+                  <input required value={buyerForm.nume} onChange={(e) => setBuyerForm((p) => ({ ...p, nume: e.target.value }))} className="input-field" placeholder="Popescu" />
+                </div>
+                <div>
+                  <label className="label">Telefon * (WhatsApp)</label>
+                  <input required value={buyerForm.telefon} onChange={(e) => setBuyerForm((p) => ({ ...p, telefon: e.target.value }))} className="input-field" placeholder="0721234567" type="tel" />
+                </div>
+                <div>
+                  <label className="label">Email</label>
+                  <input value={buyerForm.email} onChange={(e) => setBuyerForm((p) => ({ ...p, email: e.target.value }))} className="input-field" placeholder="email@optional.com" type="email" />
+                </div>
+                <div className="col-span-2 flex gap-2 justify-end">
+                  <button type="button" onClick={() => setShowAddBuyer(false)} className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium">Anuleaza</button>
+                  <button type="submit" disabled={addingBuyer} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium disabled:opacity-50">
+                    {addingBuyer ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                    Adauga si trimite link
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {buyers.length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-100 p-10 text-center">
+              <Users className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+              <p className="text-sm text-gray-500">Niciun cumparator adaugat</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {buyers.map((buyer) => (
+                <div key={buyer.id} className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-4">
+                  <div className="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-semibold text-emerald-600">
+                    {buyer.prenume[0]}{buyer.nume[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-900">{buyer.prenume} {buyer.nume}</p>
+                    <p className="text-xs text-slate-400">{buyer.telefon}</p>
+                  </div>
+                  <button onClick={() => copyBuyerLink(buyer.token)} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
+                    <Copy className="w-3.5 h-3.5" />
+                    Copiaza link
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Offers tab */}
+      {activeTab === 'oferte' && (
+        <div className="space-y-4">
+          <h2 className="text-sm font-semibold text-slate-700">Oferte primite</h2>
+
+          {offers.length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-100 p-10 text-center">
+              <Euro className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+              <p className="text-sm text-gray-500">Nicio oferta primita inca</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {offers.map((offer) => (
+                <div key={offer.id} className={`bg-white rounded-xl border p-5 ${offer.status === 'acceptata' ? 'border-green-200 bg-green-50' : 'border-gray-100'}`}>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-slate-600 mb-1">{offer.buyer?.prenume} {offer.buyer?.nume}</p>
+                      <p className="text-2xl font-bold text-slate-900">{formatCurrency(offer.suma)}</p>
+                      {offer.mesaj && <p className="text-sm text-slate-500 mt-1 italic">&quot;{offer.mesaj}&quot;</p>}
+                      <p className="text-xs text-slate-400 mt-2">{formatDateTime(offer.created_at)}</p>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      {offer.status === 'acceptata' ? (
+                        <span className="badge bg-green-100 text-green-700 flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3" />
+                          Acceptata
+                        </span>
+                      ) : offer.status === 'in_asteptare' && dealroom.status !== 'inchis' ? (
+                        <button
+                          onClick={() => handleConfirmOffer(offer.id)}
+                          disabled={confirmingOffer === offer.id}
+                          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                        >
+                          {confirmingOffer === offer.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                          Confirma oferta
+                        </button>
+                      ) : (
+                        <span className="badge bg-gray-100 text-gray-500">
+                          <Clock className="w-3 h-3 mr-1" />
+                          In asteptare
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
