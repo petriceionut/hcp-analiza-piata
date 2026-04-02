@@ -153,39 +153,45 @@ export async function POST(
       )
     }
 
-    // Safely parse SignWell response — body may be empty or non-JSON
-    let signwellData: Record<string, unknown> = {}
+    // SignWell returned 2xx — everything below is best-effort.
+    // Any failure must NOT return 500 to the frontend since the document was sent.
     try {
-      signwellData = responseText ? JSON.parse(responseText) : {}
-    } catch (parseErr) {
-      console.error('[trimite] Failed to parse SignWell response as JSON:', parseErr, '| raw:', responseText)
-      // SignWell returned 200 but unparseable body — treat as success without a document ID
+      // Safely parse response body — may be empty or non-JSON
+      let signwellData: Record<string, unknown> = {}
+      try {
+        signwellData = responseText ? JSON.parse(responseText) : {}
+      } catch {
+        console.error('[trimite] SignWell response not JSON | raw:', responseText)
+      }
+      console.log('[trimite] SignWell parsed response keys:', Object.keys(signwellData))
+
+      // ID may be at response.id or response.data.id depending on API version
+      const signwellDocumentId: string | null =
+        (signwellData?.id as string | undefined) ??
+        ((signwellData?.data as Record<string, unknown> | undefined)?.id as string | undefined) ??
+        null
+      console.log('[trimite] SignWell document_id:', signwellDocumentId)
+
+      const { error: updateError } = await supabase
+        .from('contracts')
+        .update({
+          status: 'trimis_client',
+          ...(signwellDocumentId ? { signwell_document_id: signwellDocumentId } : {}),
+        })
+        .eq('id', params.id)
+
+      if (updateError) {
+        console.error('[trimite] Supabase update error (non-fatal):', updateError)
+      } else {
+        console.log('[trimite] Supabase updated | signwell_document_id:', signwellDocumentId)
+      }
+
+      return NextResponse.json({ success: true, signwellDocumentId })
+    } catch (postSuccessErr) {
+      // SignWell succeeded — log the post-processing error but still return success
+      console.error('[trimite] Post-success processing error (non-fatal):', postSuccessErr)
+      return NextResponse.json({ success: true, signwellDocumentId: null })
     }
-    console.log('[trimite] SignWell parsed response keys:', Object.keys(signwellData))
-
-    // ID may be at response.id or response.data.id depending on API version
-    const signwellDocumentId =
-      (signwellData?.id as string | undefined) ??
-      (signwellData?.data as Record<string, unknown> | undefined)?.id as string | undefined ??
-      null
-
-    console.log('[trimite] SignWell document_id:', signwellDocumentId)
-
-    const { error: updateError } = await supabase
-      .from('contracts')
-      .update({
-        status: 'trimis_client',
-        ...(signwellDocumentId ? { signwell_document_id: signwellDocumentId } : {}),
-      })
-      .eq('id', params.id)
-
-    if (updateError) {
-      console.error('[trimite] Supabase update error:', updateError)
-      throw updateError
-    }
-
-    console.log('[trimite] Success | signwell_document_id:', signwellDocumentId)
-    return NextResponse.json({ signwellDocumentId })
   } catch (err) {
     console.error('[POST /api/contracts/[id]/trimite] Unexpected error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
