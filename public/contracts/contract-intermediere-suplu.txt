@@ -1,0 +1,74 @@
+CONTRACT DE INTERMEDIERE IMOBILIARĂ – REPREZENTARE SIMPLĂ (NEEXCLUSIVĂ)
+
+Între:
+HOME CAPITAL PARTNERS SRL, înregistrată la Registrul Comerțului sub nr. […],
+CUI 52331147, reprezentată de {{AGENT_NUME}}, denumită în continuare „Agenția”
+și
+[Clientul – Proprietarul], domiciliat în {{ADRESA_CLIENT}}, CNP […], CI seria {{SERIE_BULETIN}}, nr. {{NR_BULETIN}}, denumit în
+continuare „Clientul”
+s-a încheiat prezentul contract:
+Art. 1. Obiectul contractului
+Clientul mandatază Agenția să intermedieze vânzarea imobilului situat în {{ADRESA_IMOBIL}}, în condițiile prezentului contract.
+Art. 2. Durata contractului
+Prezentul contract este valabil {{DURATA}} luni de la data semnării.
+Art. 3. Reprezentarea
+•
+•
+•
+
+Contractul este neexclusiv.
+Clientul are dreptul de a colabora și cu alte agenții sau de a încheia tranzacția prin
+mijloace proprii.
+Agenția are dreptul la comision doar dacă tranzacția se finalizează prin
+intermediul său.
+
+Art. 4. Obligațiile Agenției
+•
+•
+•
+•
+
+Să promoveze imobilul prin canalele proprii.
+Să prezinte potențialilor clienți informații corecte despre proprietate.
+Să informeze Clientul cu privire la vizionări, oferte și demersuri efectuate.
+Să asiste Clientul la negociere și semnarea contractului.
+
+Art. 5. Obligațiile Clientului
+•
+•
+•
+•
+
+Să pună la dispoziția Agenției actele de proprietate și alte documente necesare
+promovării.
+Să permită accesul la imobil pentru vizionări.
+Să informeze Agenția dacă tranzacția se realizează prin intermediul său.
+Să achite Agenției comisionul convenit dacă tranzacția se finalizează prin
+intermediul acesteia.
+
+Art. 6. Comisionul
+•
+
+Comisionul Agenției este de {{COMISION}}% din prețul de vânzare al imobilului.
+
+•
+
+Comisionul devine scadent și se achită la semnarea contractului de vânzarecumpărare.
+
+Art. 7. Încetarea contractului
+Contractul încetează:
+•
+•
+•
+
+prin ajungere la termen;
+prin acordul părților;
+prin denunțare unilaterală, cu notificare scrisă transmisă cu cel puțin 15 zile
+înainte.
+
+Semnături:
+Client ________________________
+
+Agenția _______________________
+
+

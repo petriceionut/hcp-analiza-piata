@@ -1,0 +1,102 @@
+CONTRACT DE INTERMEDIERE IMOBILIARĂ – REPREZENTARE EXCLUSIVĂ
+Nr. {{NR_CONTRACT}} Data semnării: {{DATA_SEMNARE}} Data incepere aplicare {{DATA_INCEPERE}}
+
+Art. 1 PARTILE CONTRACTANTE
+HOME CAPITAL PARTNERS SRL, cu sediul
+social în Bucuresti, str. Apusului nr. 31, bl. M5,
+sc. B, et. 1, ap. 52, sector 6, Numar de ordine in
+Registrul comertului J20250612292003, cod
+unic de înregistrare 52331147, capital social
+200 lei, Cont: RO79BTRLRONCRT0CZ6691801
+deschis la Banca Transilvania, prin consultant
+imobiliar, {{AGENT_NUME}}
+tel {{AGENT_TEL}}
+e-mail {{AGENT_EMAIL}},
+pe de o parte in calitate de intermediar
+exclusiv şi numită în continuare „Agenţia”, şi
+
+Dl/D-na {{PRENUME_CLIENT}} {{NUME_CLIENT}}, având CNP
+{{CNP}} act de identitate seria {{SERIE_BULETIN}} nr {{NR_BULETIN}},
+domiciliat în {{ADRESA_CLIENT}},
+tel {{TEL_CLIENT}},
+e-mail {{EMAIL_CLIENT}},
+Împreuna şi în solidar / şi pentru / pentru
+Dl/D-na {{PRENUME_CLIENT2}} {{NUME_CLIENT2}}, având CNP
+{{CNP2}} act de identitate seria {{SERIE_BULETIN2}} nr {{NR_BULETIN2}},
+domiciliat în {{ADRESA_CLIENT2}},
+tel {{TEL_CLIENT2}},
+e-mail {{EMAIL_CLIENT2}},
+care declară că deţin(e) drepturile mai jos arătate asupra Imobilului
+descris in Contract, urmând a fi numit(i) în continuare simplu „Client”,
+
+s-a încheiat prezentul contract:
+Art. 1. Obiectul contractului
+Clientul acordă Agenției drept exclusiv de intermediere a vânzării imobilului situat în
+{{ADRESA_IMOBIL}}, conform prezentului contract.
+Art. 2. Durata contractului
+•
+•
+
+Contractul este valabil {{DURATA}} luni de la data semnării.
+La expirare, încetează de drept, dar Agenția beneficiază de un termen de protecție
+de 90 de zile, timp în care Clientul nu poate tranzacționa cu terți identificați de
+Agenție.
+
+Art. 3. Exclusivitatea
+•
+•
+•
+
+Clientul nu poate apela la o altă agenție sau la alți intermediari pentru vânzarea
+imobilului.
+Clientul nu poate încheia tranzacția prin mijloace proprii fără participarea Agenției.
+În cazul în care contractul este încălcat, Clientul datorează Agenției comisionul
+stabilit.
+
+Art. 4. Obligațiile Agenției
+•
+•
+•
+•
+
+Promovarea imobilului pe canalele proprii.
+Organizarea vizionărilor și identificarea potențialilor cumpărători.
+Informarea Clientului cu privire la demersuri și oferte.
+Asistarea Clientului la negocieri și semnarea tranzacției.
+
+
+Art. 5. Obligațiile Clientului
+•
+•
+•
+•
+
+Punerea la dispoziția Agenției a documentelor de proprietate.
+Permiterea accesului la imobil pentru vizionări.
+Respectarea exclusivității și neîncheierea altor contracte de intermediere.
+Achitarea comisionului stabilit în contract.
+
+Art. 6. Comisionul
+•
+•
+•
+
+Comisionul Agenției este de {{COMISION}}% din prețul de vânzare al imobilului.
+Este datorat și în cazul în care Clientul încheie tranzacția direct sau prin altă
+agenție pe durata contractului.
+Plata comisionului se face la data semnării contractului de vânzare-cumpărare.
+
+Art. 7. Încetarea contractului
+•
+•
+
+La expirarea duratei, prin acordul părților sau prin denunțare unilaterală cu
+notificare scrisă cu 15 zile înainte.
+Încetarea nu afectează dreptul Agenției la comision pentru clienții prezentați în
+perioada contractului sau în termenul de protecție.
+
+Semnături:
+Client ________________________
+
+Agenția _______________________
+

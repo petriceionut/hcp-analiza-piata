@@ -14,6 +14,7 @@ export type PropertyType =
 export type ContractStatus =
   | 'draft'
   | 'trimis_client'
+  | 'vizualizat_client'
   | 'semnat_client'
   | 'semnat_ambele'
   | 'finalizat'
@@ -61,6 +62,7 @@ export interface Contract {
   derogari?: string
   status: ContractStatus
   pdf_url?: string
+  signwell_document_id?: string
   client_token?: string
   agent_token?: string
   client_semnat_la?: string

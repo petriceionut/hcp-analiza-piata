@@ -1,14 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { WizardData } from '../ContractWizard'
 import { CONTRACT_TYPES, PROPERTY_TYPES } from '@/lib/utils'
 import {
   ArrowLeft,
   Send,
-  MessageCircle,
-  Mail,
   Loader2,
   CheckCircle,
   Eye,
@@ -21,63 +19,73 @@ interface Props {
   onBack: () => void
 }
 
-type SendMethod = 'email' | 'whatsapp' | null
-
 export default function StepPreview({ data, onBack }: Props) {
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [contractId, setContractId] = useState<string | null>(null)
-  const [sendMethod, setSendMethod] = useState<SendMethod>(null)
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
+  const contractTextRef = useRef<string>('')
   const router = useRouter()
 
-  const handleSave = async () => {
-    setSaving(true)
+  const handleTextReady = (text: string) => {
+    contractTextRef.current = text
+  }
+
+  const handleSaveAndSend = async () => {
+    if (sending || sent) return
+    setSending(true)
+
     try {
-      const res = await fetch('/api/contracts', {
+      const contractText = contractTextRef.current
+      if (!contractText) throw new Error('Contract text not loaded yet')
+
+      // 1. Save contract to Supabase
+      const saveRes = await fetch('/api/contracts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       })
 
-      if (!res.ok) throw new Error('Save failed')
+      if (!saveRes.ok) {
+        const saveErr = await saveRes.json().catch(() => ({ error: `HTTP ${saveRes.status}` }))
+        console.error('[StepPreview] Save failed:', saveErr)
+        throw new Error(saveErr?.detail ?? saveErr?.error ?? `Failed to save contract (${saveRes.status})`)
+      }
+      const saveJson = await saveRes.json()
+      const contractId: string | undefined = saveJson?.id
+      console.log('[StepPreview] Saved contract id:', contractId)
+      if (!contractId) throw new Error('Save succeeded but returned no contract ID')
 
-      const { id } = await res.json()
-      setContractId(id)
-      setSaved(true)
-      toast.success('Contract salvat cu succes!')
-    } catch {
-      toast.error('Eroare la salvarea contractului')
-    } finally {
-      setSaving(false)
-    }
-  }
+      // 2. Send contract text to server — server generates PDF and calls SignWell
+      const clientEmail = data.clientData?.email ?? ''
+      const clientName  = `${data.clientData?.prenume ?? ''} ${data.clientData?.nume ?? ''}`.trim() || 'Client'
 
-  const handleSend = async (method: SendMethod) => {
-    if (!contractId || !method) return
-    setSendMethod(method)
-    setSending(true)
+      console.log('[StepPreview] clientData:', JSON.stringify(data.clientData ?? null))
+      console.log('[StepPreview] clientEmail:', clientEmail, '| clientName:', clientName)
 
-    try {
-      const res = await fetch(`/api/contracts/${contractId}/trimite`, {
+      if (!clientEmail) throw new Error('Email-ul clientului lipseste. Reveniti la pasul Date client si completati email-ul.')
+
+      const trimiteUrl = `/api/contracts/${contractId}/trimite`
+      const trimiteBody = { contractText, clientEmail, clientName, agentEmail: '', agentName: 'Agent' }
+      console.log('[StepPreview] Calling:', trimiteUrl, '| body keys:', Object.keys(trimiteBody), '| clientEmail:', clientEmail)
+
+      const sendRes = await fetch(trimiteUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ method }),
+        body: JSON.stringify(trimiteBody),
       })
 
-      if (!res.ok) throw new Error('Send failed')
+      if (!sendRes.ok) {
+        const errData = await sendRes.json().catch(() => ({}))
+        console.error('[StepPreview] Send failed:', errData)
+        throw new Error(errData?.detail ?? errData?.error ?? `Failed to send contract (${sendRes.status})`)
+      }
 
       setSent(true)
-      toast.success(
-        method === 'email'
-          ? `Email trimis la ${data.clientData?.email}`
-          : `WhatsApp trimis la ${data.clientData?.telefon}`
-      )
+      toast.success(`Contractul a fost trimis la ${data.clientData?.email} pentru semnare`)
 
-      setTimeout(() => router.push('/contracte'), 2000)
-    } catch {
-      toast.error('Eroare la trimiterea contractului')
+      setTimeout(() => router.push('/contracte'), 3000)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Eroare necunoscuta'
+      toast.error(`Eroare: ${message}`)
     } finally {
       setSending(false)
     }
@@ -106,7 +114,7 @@ export default function StepPreview({ data, onBack }: Props) {
           </span>
         </div>
         <div className="max-h-96 overflow-y-auto p-6 bg-white">
-          <ContractPreviewContent data={data} />
+          <ContractPreviewContent data={data} onTextReady={handleTextReady} />
         </div>
       </div>
 
@@ -130,25 +138,36 @@ export default function StepPreview({ data, onBack }: Props) {
       </div>
 
       {/* Actions */}
-      {!saved ? (
+      {sent ? (
+        <div className="text-center py-6">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle className="w-8 h-8 text-green-600" />
+          </div>
+          <p className="text-lg font-semibold text-gray-900">Contract trimis cu succes!</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Clientul va primi un email cu link pentru a semna contractul
+          </p>
+        </div>
+      ) : (
         <div className="flex justify-between">
           <button
             type="button"
             onClick={onBack}
-            className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-sm font-semibold transition-all"
+            disabled={sending}
+            className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-50 text-gray-700 rounded-lg text-sm font-semibold transition-all"
           >
             <ArrowLeft className="w-4 h-4" />
             Inapoi
           </button>
           <button
-            onClick={handleSave}
-            disabled={saving}
+            onClick={handleSaveAndSend}
+            disabled={sending}
             className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg text-sm font-semibold transition-all"
           >
-            {saving ? (
+            {sending ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Se salveaza...
+                Se trimite…
               </>
             ) : (
               <>
@@ -157,67 +176,6 @@ export default function StepPreview({ data, onBack }: Props) {
               </>
             )}
           </button>
-        </div>
-      ) : (
-        <div className="fade-in">
-          {!sent ? (
-            <>
-              <div className="flex items-center gap-2 mb-4 text-green-600 bg-green-50 rounded-lg p-3">
-                <CheckCircle className="w-5 h-5" />
-                <span className="text-sm font-medium">Contract salvat! Alege cum trimiti clientului:</span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                {/* Email */}
-                <button
-                  onClick={() => handleSend('email')}
-                  disabled={sending}
-                  className="flex flex-col items-center gap-3 p-5 border-2 border-blue-200 hover:border-blue-400 hover:bg-blue-50 rounded-xl transition-all group"
-                >
-                  <div className="w-12 h-12 bg-blue-100 group-hover:bg-blue-200 rounded-full flex items-center justify-center transition-colors">
-                    {sending && sendMethod === 'email' ? (
-                      <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
-                    ) : (
-                      <Mail className="w-6 h-6 text-blue-600" />
-                    )}
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm font-semibold text-gray-900">Email</p>
-                    <p className="text-xs text-gray-500 break-all">{data.clientData?.email}</p>
-                  </div>
-                </button>
-
-                {/* WhatsApp */}
-                <button
-                  onClick={() => handleSend('whatsapp')}
-                  disabled={sending}
-                  className="flex flex-col items-center gap-3 p-5 border-2 border-green-200 hover:border-green-400 hover:bg-green-50 rounded-xl transition-all group"
-                >
-                  <div className="w-12 h-12 bg-green-100 group-hover:bg-green-200 rounded-full flex items-center justify-center transition-colors">
-                    {sending && sendMethod === 'whatsapp' ? (
-                      <Loader2 className="w-6 h-6 text-green-600 animate-spin" />
-                    ) : (
-                      <MessageCircle className="w-6 h-6 text-green-600" />
-                    )}
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm font-semibold text-gray-900">WhatsApp</p>
-                    <p className="text-xs text-gray-500">{data.clientData?.telefon}</p>
-                  </div>
-                </button>
-              </div>
-            </>
-          ) : (
-            <div className="text-center py-6">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="w-8 h-8 text-green-600" />
-              </div>
-              <p className="text-lg font-semibold text-gray-900">Contract trimis cu succes!</p>
-              <p className="text-sm text-gray-500 mt-1">
-                Clientul va primi un link pentru a semna contractul
-              </p>
-            </div>
-          )}
         </div>
       )}
     </div>
