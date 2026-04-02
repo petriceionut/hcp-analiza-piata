@@ -55,7 +55,13 @@ export default function StepPreview({ data, onBack }: Props) {
       const sendRes = await fetch(`/api/contracts/${contractId}/trimite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contractText }),
+        body: JSON.stringify({
+          contractText,
+          clientEmail: data.clientData?.email ?? '',
+          clientName:  `${data.clientData?.prenume ?? ''} ${data.clientData?.nume ?? ''}`.trim() || 'Client',
+          agentEmail:  '',
+          agentName:   'Agent',
+        }),
       })
 
       if (!sendRes.ok) {
