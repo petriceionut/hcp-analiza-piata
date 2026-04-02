@@ -31,8 +31,9 @@ export async function POST(
 
   const clientName = `${contract.client_data?.prenume} ${contract.client_data?.nume}`
 
+  let deliveryWarning: string | undefined
+
   if (method === 'email') {
-    // Send email with signing link
     try {
       await sendEmail({
         to: contract.client_data.email,
@@ -41,10 +42,9 @@ export async function POST(
       })
     } catch (e) {
       console.error('Email send error:', e)
-      // Don't fail the request if email fails, just log
+      deliveryWarning = 'Email sending failed. Check RESEND_API_KEY.'
     }
   } else if (method === 'whatsapp') {
-    // Send WhatsApp message
     try {
       await sendWhatsApp({
         to: contract.client_data.telefon,
@@ -52,6 +52,7 @@ export async function POST(
       })
     } catch (e) {
       console.error('WhatsApp send error:', e)
+      deliveryWarning = 'WhatsApp sending failed. Check Twilio credentials.'
     }
   }
 
@@ -61,7 +62,7 @@ export async function POST(
     .update({ status: 'trimis_client' })
     .eq('id', params.id)
 
-  return NextResponse.json({ success: true, signingLink })
+  return NextResponse.json({ success: true, signingLink, warning: deliveryWarning })
 }
 
 async function sendEmail({
@@ -92,7 +93,10 @@ async function sendEmail({
     }),
   })
 
-  if (!res.ok) throw new Error('Email API error')
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Resend API error ${res.status}: ${body}`)
+  }
 }
 
 async function sendWhatsApp({ to, message }: { to: string; message: string }) {
