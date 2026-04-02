@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-// ─── Supabase (service role — bypasses RLS) ──────────────────────────────────
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -9,9 +8,33 @@ function getSupabase() {
   return createClient(url, key)
 }
 
-const N8N_WEBHOOK = 'https://phimlwgsahtksocglifl.supabase.co/functions/v1/signwell-trimite'
+const APP_URL = 'https://hcp-analiza-piata.vercel.app'
 
-// ─── Route handler ────────────────────────────────────────────────────────────
+async function sendEmail(to: string, subject: string, html: string) {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    console.warn('[trimite] RESEND_API_KEY not set — email not sent to', to)
+    return
+  }
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: 'HCP Analiza Piata <noreply@homoecapital.ro>',
+      to,
+      subject,
+      html,
+    }),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    console.error('[trimite] Resend error:', res.status, body)
+  }
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } },
@@ -23,8 +46,7 @@ export async function POST(
   let body: Record<string, unknown>
   try {
     body = await request.json()
-  } catch (e) {
-    console.error('[trimite] 1 FAIL – parse body:', e)
+  } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
@@ -32,71 +54,69 @@ export async function POST(
   const clientEmail  = typeof body.clientEmail  === 'string' ? body.clientEmail  : ''
   const clientName   = typeof body.clientName   === 'string' ? body.clientName   : 'Client'
 
-  console.log(`[trimite] 1 OK – clientEmail=${clientEmail} clientName=${clientName}`)
+  console.log(`[trimite] clientEmail=${clientEmail} clientName=${clientName}`)
 
   if (!clientEmail) {
     return NextResponse.json({ error: 'clientEmail is required' }, { status: 400 })
   }
+  if (!contractText) {
+    return NextResponse.json({ error: 'contractText is required' }, { status: 400 })
+  }
 
-  // ── 2. Call n8n webhook (n8n handles SignWell) ─────────────────────────────
-  let n8nStatus = 0
-  let n8nBody   = ''
-  try {
-    const n8nPayload = { contractText, clientEmail, clientName, contractId }
-    console.log(`[trimite] 2 – POST ${N8N_WEBHOOK} | clientEmail=${clientEmail} contractId=${contractId}`)
+  const supabase = getSupabase()
 
-    const n8nRes = await fetch(N8N_WEBHOOK, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(n8nPayload),
+  // ── 2. Save signature request (generates a unique token) ──────────────────
+  const { data: sigReq, error: insertErr } = await supabase
+    .from('signature_requests')
+    .insert({
+      contract_id:   contractId,
+      client_email:  clientEmail,
+      client_name:   clientName,
+      contract_text: contractText,
+      status:        'pending',
     })
+    .select('token')
+    .single()
 
-    n8nStatus = n8nRes.status
-    n8nBody   = await n8nRes.text()
-    console.log(`[trimite] 2 – n8n response status=${n8nStatus} body=${n8nBody}`)
-
-    if (!n8nRes.ok) {
-      return NextResponse.json(
-        { error: 'n8n webhook error', detail: n8nBody, httpStatus: n8nStatus },
-        { status: 502 },
-      )
-    }
-  } catch (e) {
-    console.error('[trimite] 2 FAIL – fetch to n8n:', e)
-    return NextResponse.json({ error: 'Failed to reach n8n webhook', detail: String(e) }, { status: 502 })
+  if (insertErr || !sigReq) {
+    console.error('[trimite] failed to insert signature_request:', insertErr)
+    return NextResponse.json(
+      { error: 'Nu s-a putut crea cererea de semnătură', detail: insertErr?.message },
+      { status: 500 },
+    )
   }
 
-  // ── 3. Parse n8n response for documentId (best-effort) ────────────────────
-  let documentId: string | null = null
+  const signingToken = sigReq.token
+  const signingLink  = `${APP_URL}/semneaza/${signingToken}`
+  console.log(`[trimite] signingLink=${signingLink}`)
+
+  // ── 3. Send signing link email to client ──────────────────────────────────
   try {
-    const n8nData = n8nBody ? JSON.parse(n8nBody) : {}
-    documentId =
-      (n8nData?.documentId     as string | undefined) ??
-      (n8nData?.id             as string | undefined) ??
-      (n8nData?.data?.id       as string | undefined) ??
-      null
-    console.log(`[trimite] 3 OK – documentId=${documentId}`)
+    await sendEmail(
+      clientEmail,
+      'Document de semnat — HCP Analiza Piata',
+      `<p>Bună ziua, <strong>${clientName}</strong>,</p>
+      <p>Vă rugăm să citiți și să semnați documentul la linkul de mai jos:</p>
+      <p><a href="${signingLink}" style="font-size:16px;font-weight:bold;">${signingLink}</a></p>
+      <p>Linkul este valabil o singură dată.</p>
+      <p>Mulțumim,<br/>Echipa HCP Analiza Piata</p>`,
+    )
   } catch (e) {
-    console.warn('[trimite] 3 WARN – could not parse n8n response (non-fatal):', e)
+    console.warn('[trimite] email send failed (non-fatal):', e)
   }
 
-  // ── 4. Update Supabase (best-effort — n8n already succeeded) ──────────────
+  // ── 4. Update contract status (best-effort) ────────────────────────────────
   try {
-    const supabase = getSupabase()
-    const update: Record<string, unknown> = { status: 'trimis_client' }
-    if (documentId) update.signwell_document_id = documentId
-
-    const { error } = await supabase.from('contracts').update(update).eq('id', contractId)
-    if (error) {
-      console.error('[trimite] 4 WARN – Supabase update failed (non-fatal):', error)
-    } else {
-      console.log(`[trimite] 4 OK – Supabase updated status=trimis_client`)
-    }
+    const { error } = await supabase
+      .from('contracts')
+      .update({ status: 'trimis_client' })
+      .eq('id', contractId)
+    if (error) console.warn('[trimite] contract status update failed (non-fatal):', error)
+    else console.log(`[trimite] contract ${contractId} → trimis_client`)
   } catch (e) {
-    console.error('[trimite] 4 WARN – Supabase threw (non-fatal):', e)
+    console.warn('[trimite] contract update threw (non-fatal):', e)
   }
 
-  // ── 5. Return success ──────────────────────────────────────────────────────
-  console.log(`[trimite] DONE contractId=${contractId} documentId=${documentId}`)
-  return NextResponse.json({ success: true, documentId })
+  console.log(`[trimite] DONE contractId=${contractId} token=${signingToken}`)
+  return NextResponse.json({ success: true, signingToken, signingLink })
 }
