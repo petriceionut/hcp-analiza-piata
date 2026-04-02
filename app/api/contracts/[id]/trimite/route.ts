@@ -9,7 +9,7 @@ function getSupabase() {
   return createClient(url, key)
 }
 
-const N8N_WEBHOOK = 'https://petriceionut.app.n8n.cloud/webhook/signwell-trimite'
+const N8N_WEBHOOK = 'https://phimlwgsahtksocglifl.supabase.co/functions/v1/signwell-trimite'
 
 // ─── Route handler ────────────────────────────────────────────────────────────
 export async function POST(
