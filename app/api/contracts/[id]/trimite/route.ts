@@ -39,7 +39,7 @@ export async function POST(
   }
 
   // ── 2. Read API key ────────────────────────────────────────────────────────
-  const apiKey = Buffer.from(process.env.SIGNWELL_API_KEY ?? '', 'base64').toString('utf8')
+  const apiKey = process.env.SIGNWELL_API_KEY ?? ''
   console.log(`[trimite] 2 – SIGNWELL_API_KEY present=${!!apiKey} length=${apiKey.length}`)
   if (!apiKey) {
     return NextResponse.json({ error: 'SIGNWELL_API_KEY not configured' }, { status: 500 })
