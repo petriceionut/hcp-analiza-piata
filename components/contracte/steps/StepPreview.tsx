@@ -55,18 +55,22 @@ export default function StepPreview({ data, onBack }: Props) {
       if (!contractId) throw new Error('Save succeeded but returned no contract ID')
 
       // 2. Send contract text to server — server generates PDF and calls SignWell
+      const clientEmail = data.clientData?.email ?? ''
+      const clientName  = `${data.clientData?.prenume ?? ''} ${data.clientData?.nume ?? ''}`.trim() || 'Client'
+
+      console.log('[StepPreview] clientData:', JSON.stringify(data.clientData ?? null))
+      console.log('[StepPreview] clientEmail:', clientEmail, '| clientName:', clientName)
+
+      if (!clientEmail) throw new Error('Email-ul clientului lipseste. Reveniti la pasul Date client si completati email-ul.')
+
       const trimiteUrl = `/api/contracts/${contractId}/trimite`
-      console.log('[StepPreview] Calling:', trimiteUrl)
+      const trimiteBody = { contractText, clientEmail, clientName, agentEmail: '', agentName: 'Agent' }
+      console.log('[StepPreview] Calling:', trimiteUrl, '| body keys:', Object.keys(trimiteBody), '| clientEmail:', clientEmail)
+
       const sendRes = await fetch(trimiteUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contractText,
-          clientEmail: data.clientData?.email ?? '',
-          clientName:  `${data.clientData?.prenume ?? ''} ${data.clientData?.nume ?? ''}`.trim() || 'Client',
-          agentEmail:  '',
-          agentName:   'Agent',
-        }),
+        body: JSON.stringify(trimiteBody),
       })
 
       if (!sendRes.ok) {
