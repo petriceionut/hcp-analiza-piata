@@ -64,7 +64,7 @@ export default function StepPreview({ data, onBack }: Props) {
       if (!clientEmail) throw new Error('Email-ul clientului lipseste. Reveniti la pasul Date client si completati email-ul.')
 
       const trimiteUrl = `/api/contracts/${contractId}/trimite`
-      const trimiteBody = { contractText, clientEmail, clientName, agentEmail: '', agentName: 'Agent' }
+      const trimiteBody = { method: 'email', contractText, clientEmail, clientName }
       console.log('[StepPreview] Calling:', trimiteUrl, '| body keys:', Object.keys(trimiteBody), '| clientEmail:', clientEmail)
 
       const sendRes = await fetch(trimiteUrl, {

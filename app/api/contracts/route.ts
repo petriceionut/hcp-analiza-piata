@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
         cheltuieli_lunare: body.cheltuieliLunare ?? null,
         derogari: body.derogari ?? null,
         status: 'draft',
+        client_token: crypto.randomUUID(),
       })
       .select('id')
       .single()
