@@ -49,10 +49,15 @@ export default function StepPreview({ data, onBack }: Props) {
         console.error('[StepPreview] Save failed:', saveErr)
         throw new Error(saveErr?.detail ?? saveErr?.error ?? `Failed to save contract (${saveRes.status})`)
       }
-      const { id: contractId } = await saveRes.json()
+      const saveJson = await saveRes.json()
+      const contractId: string | undefined = saveJson?.id
+      console.log('[StepPreview] Saved contract id:', contractId)
+      if (!contractId) throw new Error('Save succeeded but returned no contract ID')
 
       // 2. Send contract text to server — server generates PDF and calls SignWell
-      const sendRes = await fetch(`/api/contracts/${contractId}/trimite`, {
+      const trimiteUrl = `/api/contracts/${contractId}/trimite`
+      console.log('[StepPreview] Calling:', trimiteUrl)
+      const sendRes = await fetch(trimiteUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
