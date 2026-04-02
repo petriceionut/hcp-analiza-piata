@@ -9,6 +9,8 @@ function getSupabase() {
   return createClient(url, key)
 }
 
+const N8N_WEBHOOK = 'https://petriceionut.app.n8n.cloud/webhook/signwell-trimite'
+
 // ─── Route handler ────────────────────────────────────────────────────────────
 export async function POST(
   request: NextRequest,
@@ -26,91 +28,59 @@ export async function POST(
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const contractText  = typeof body.contractText  === 'string' ? body.contractText  : ''
-  const clientEmail   = typeof body.clientEmail   === 'string' ? body.clientEmail   : ''
-  const clientName    = typeof body.clientName    === 'string' ? body.clientName    : 'Client'
-  const agentEmail    = typeof body.agentEmail    === 'string' ? body.agentEmail    : ''
-  const agentName     = typeof body.agentName     === 'string' ? body.agentName     : 'Agent'
+  const contractText = typeof body.contractText === 'string' ? body.contractText : ''
+  const clientEmail  = typeof body.clientEmail  === 'string' ? body.clientEmail  : ''
+  const clientName   = typeof body.clientName   === 'string' ? body.clientName   : 'Client'
 
-  console.log(`[trimite] 1 OK – clientEmail=${clientEmail} agentEmail=${agentEmail}`)
+  console.log(`[trimite] 1 OK – clientEmail=${clientEmail} clientName=${clientName}`)
 
   if (!clientEmail) {
     return NextResponse.json({ error: 'clientEmail is required' }, { status: 400 })
   }
 
-  // ── 2. Read API key ────────────────────────────────────────────────────────
-  const apiKey = process.env.SIGNWELL_API_KEY ?? ''
-  console.log(`[trimite] 2 – SIGNWELL_API_KEY present=${!!apiKey} length=${apiKey.length}`)
-  if (!apiKey) {
-    return NextResponse.json({ error: 'SIGNWELL_API_KEY not configured' }, { status: 500 })
-  }
-
-  // ── 3. Encode contract as base64 text file ────────────────────────────────
-  const fileBase64 = Buffer.from(contractText || 'Contract', 'utf-8').toString('base64')
-  console.log(`[trimite] 3 OK – txt ${Math.round(fileBase64.length / 1024)} KB`)
-
-  // ── 4. Call SignWell API ───────────────────────────────────────────────────
-  let swStatus = 0
-  let swBody   = ''
+  // ── 2. Call n8n webhook (n8n handles SignWell) ─────────────────────────────
+  let n8nStatus = 0
+  let n8nBody   = ''
   try {
-    const dueDate = new Date(Date.now() + 14 * 86_400_000).toISOString().split('T')[0]
+    const n8nPayload = { contractText, clientEmail, clientName, contractId }
+    console.log(`[trimite] 2 – POST ${N8N_WEBHOOK} | clientEmail=${clientEmail} contractId=${contractId}`)
 
-    const payload = {
-      test_mode: false,
-      draft:     false,
-      name:      `Contract ${contractId}`,
-      due_date:  dueDate,
-      files:     [{ name: 'contract.txt', base64_file_contents: fileBase64 }],
-      recipients: [
-        { id: '1', name: clientName, email: clientEmail, placeholder_name: 'CLIENT_1' },
-      ],
-      ...(agentEmail ? { ccs: [{ name: agentName, email: agentEmail }] } : {}),
-    }
-
-    console.log(
-      `[trimite] 4 – SignWell POST | recipient=${clientEmail}` +
-      (agentEmail ? ` cc=${agentEmail}` : '') +
-      ` due=${dueDate}`
-    )
-
-    const swRes = await fetch('https://www.signwell.com/api/v1/documents/', {
+    const n8nRes = await fetch(N8N_WEBHOOK, {
       method:  'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'X-Api-Token': apiKey,
-      },
-      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(n8nPayload),
     })
 
-    swStatus = swRes.status
-    swBody   = await swRes.text()
-    console.log(`[trimite] 4 – SignWell response status=${swStatus} body=${swBody}`)
+    n8nStatus = n8nRes.status
+    n8nBody   = await n8nRes.text()
+    console.log(`[trimite] 2 – n8n response status=${n8nStatus} body=${n8nBody}`)
 
-    if (!swRes.ok) {
+    if (!n8nRes.ok) {
       return NextResponse.json(
-        { error: 'SignWell rejected the request', detail: swBody, httpStatus: swStatus },
+        { error: 'n8n webhook error', detail: n8nBody, httpStatus: n8nStatus },
         { status: 502 },
       )
     }
   } catch (e) {
-    console.error('[trimite] 4 FAIL – fetch to SignWell:', e)
-    return NextResponse.json({ error: 'Failed to reach SignWell', detail: String(e) }, { status: 502 })
+    console.error('[trimite] 2 FAIL – fetch to n8n:', e)
+    return NextResponse.json({ error: 'Failed to reach n8n webhook', detail: String(e) }, { status: 502 })
   }
 
-  // ── 5. Parse SignWell response (best-effort) ───────────────────────────────
+  // ── 3. Parse n8n response for documentId (best-effort) ────────────────────
   let documentId: string | null = null
   try {
-    const swData = swBody ? JSON.parse(swBody) : {}
+    const n8nData = n8nBody ? JSON.parse(n8nBody) : {}
     documentId =
-      (swData?.id          as string | undefined) ??
-      (swData?.data?.id    as string | undefined) ??
+      (n8nData?.documentId     as string | undefined) ??
+      (n8nData?.id             as string | undefined) ??
+      (n8nData?.data?.id       as string | undefined) ??
       null
-    console.log(`[trimite] 5 OK – SignWell documentId=${documentId}`)
+    console.log(`[trimite] 3 OK – documentId=${documentId}`)
   } catch (e) {
-    console.warn('[trimite] 5 WARN – could not parse SignWell body (non-fatal):', e)
+    console.warn('[trimite] 3 WARN – could not parse n8n response (non-fatal):', e)
   }
 
-  // ── 6. Update Supabase (best-effort — SignWell already succeeded) ──────────
+  // ── 4. Update Supabase (best-effort — n8n already succeeded) ──────────────
   try {
     const supabase = getSupabase()
     const update: Record<string, unknown> = { status: 'trimis_client' }
@@ -118,16 +88,15 @@ export async function POST(
 
     const { error } = await supabase.from('contracts').update(update).eq('id', contractId)
     if (error) {
-      console.error('[trimite] 6 WARN – Supabase update failed (non-fatal):', error)
+      console.error('[trimite] 4 WARN – Supabase update failed (non-fatal):', error)
     } else {
-      console.log(`[trimite] 6 OK – Supabase updated status=trimis_client`)
+      console.log(`[trimite] 4 OK – Supabase updated status=trimis_client`)
     }
   } catch (e) {
-    // Never let a DB error hide the SignWell success from the frontend
-    console.error('[trimite] 6 WARN – Supabase threw (non-fatal):', e)
+    console.error('[trimite] 4 WARN – Supabase threw (non-fatal):', e)
   }
 
-  // ── 7. Return success ──────────────────────────────────────────────────────
+  // ── 5. Return success ──────────────────────────────────────────────────────
   console.log(`[trimite] DONE contractId=${contractId} documentId=${documentId}`)
   return NextResponse.json({ success: true, documentId })
 }
