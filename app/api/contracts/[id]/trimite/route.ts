@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import PDFDocument from 'pdfkit'
 
 // ─── Supabase (service role — bypasses RLS) ──────────────────────────────────
 function getSupabase() {
@@ -8,48 +7,6 @@ function getSupabase() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) throw new Error('Supabase env vars missing')
   return createClient(url, key)
-}
-
-// ─── pdfkit: text → base64 PDF ───────────────────────────────────────────────
-function buildPdfBase64(text: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    try {
-      const doc = new PDFDocument({ margin: 50, size: 'A4' })
-      const chunks: Buffer[] = []
-
-      doc.on('data', (c: Buffer) => chunks.push(c))
-      doc.on('end', () => resolve(Buffer.concat(chunks).toString('base64')))
-      doc.on('error', (e: Error) => reject(e))
-
-      const usableWidth = doc.page.width - 100          // 50px margin each side
-      const bottomLimit = doc.page.height - doc.page.margins.bottom - 28
-
-      for (const raw of text.split('\n')) {
-        const line = raw.trimEnd()
-
-        if (line === '') {
-          doc.moveDown(0.35)
-          continue
-        }
-
-        const isHeading = /^(Art\.|ART\.|ANEXA|CAPITOLUL)/.test(line)
-        doc.font(isHeading ? 'Helvetica-Bold' : 'Helvetica').fontSize(isHeading ? 11 : 10)
-
-        if (doc.y > bottomLimit) doc.addPage()
-
-        doc.text(line, {
-          width: usableWidth,
-          align: isHeading ? 'left' : 'justify',
-          lineBreak: true,
-        })
-        if (!isHeading) doc.moveDown(0.05)
-      }
-
-      doc.end()
-    } catch (e) {
-      reject(e)
-    }
-  })
 }
 
 // ─── Route handler ────────────────────────────────────────────────────────────
@@ -88,16 +45,9 @@ export async function POST(
     return NextResponse.json({ error: 'SIGNWELL_API_KEY not configured' }, { status: 500 })
   }
 
-  // ── 3. Generate PDF ────────────────────────────────────────────────────────
-  let pdfBase64 = ''
-  try {
-    const t0 = Date.now()
-    pdfBase64 = await buildPdfBase64(contractText || 'Contract')
-    console.log(`[trimite] 3 OK – PDF ${Math.round(pdfBase64.length / 1024)} KB in ${Date.now() - t0}ms`)
-  } catch (e) {
-    console.error('[trimite] 3 FAIL – PDF generation:', e)
-    return NextResponse.json({ error: 'PDF generation failed', detail: String(e) }, { status: 500 })
-  }
+  // ── 3. Encode contract as base64 text file ────────────────────────────────
+  const fileBase64 = Buffer.from(contractText || 'Contract', 'utf-8').toString('base64')
+  console.log(`[trimite] 3 OK – txt ${Math.round(fileBase64.length / 1024)} KB`)
 
   // ── 4. Call SignWell API ───────────────────────────────────────────────────
   let swStatus = 0
@@ -110,7 +60,7 @@ export async function POST(
       draft:     false,
       name:      `Contract ${contractId}`,
       due_date:  dueDate,
-      files:     [{ name: 'contract.pdf', base64_file_contents: pdfBase64 }],
+      files:     [{ name: 'contract.txt', base64_file_contents: fileBase64 }],
       recipients: [
         { id: '1', name: clientName, email: clientEmail, placeholder_name: 'CLIENT_1' },
       ],
