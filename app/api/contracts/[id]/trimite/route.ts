@@ -153,12 +153,30 @@ export async function POST(
       )
     }
 
-    const signwellData = JSON.parse(responseText)
-    const signwellDocumentId = signwellData.id as string
+    // Safely parse SignWell response — body may be empty or non-JSON
+    let signwellData: Record<string, unknown> = {}
+    try {
+      signwellData = responseText ? JSON.parse(responseText) : {}
+    } catch (parseErr) {
+      console.error('[trimite] Failed to parse SignWell response as JSON:', parseErr, '| raw:', responseText)
+      // SignWell returned 200 but unparseable body — treat as success without a document ID
+    }
+    console.log('[trimite] SignWell parsed response keys:', Object.keys(signwellData))
+
+    // ID may be at response.id or response.data.id depending on API version
+    const signwellDocumentId =
+      (signwellData?.id as string | undefined) ??
+      (signwellData?.data as Record<string, unknown> | undefined)?.id as string | undefined ??
+      null
+
+    console.log('[trimite] SignWell document_id:', signwellDocumentId)
 
     const { error: updateError } = await supabase
       .from('contracts')
-      .update({ status: 'trimis_client', signwell_document_id: signwellDocumentId })
+      .update({
+        status: 'trimis_client',
+        ...(signwellDocumentId ? { signwell_document_id: signwellDocumentId } : {}),
+      })
       .eq('id', params.id)
 
     if (updateError) {
