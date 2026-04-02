@@ -23,7 +23,6 @@ export default function StepPreview({ data, onBack }: Props) {
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
   const contractTextRef = useRef<string>('')
-  const previewRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
   const handleTextReady = (text: string) => {
@@ -35,44 +34,10 @@ export default function StepPreview({ data, onBack }: Props) {
     setSending(true)
 
     try {
-      // 1. Generate PDF from the rendered contract preview
-      const [html2canvas, { jsPDF }] = await Promise.all([
-        import('html2canvas').then((m) => m.default),
-        import('jspdf'),
-      ])
+      const contractText = contractTextRef.current
+      if (!contractText) throw new Error('Contract text not loaded yet')
 
-      if (!previewRef.current) throw new Error('Preview element not found')
-
-      const canvas = await html2canvas(previewRef.current, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-      })
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.92)
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-
-      const pageWidth = pdf.internal.pageSize.getWidth()
-      const pageHeight = pdf.internal.pageSize.getHeight()
-      const imgWidth = pageWidth
-      const imgHeight = (canvas.height * pageWidth) / canvas.width
-
-      let heightLeft = imgHeight
-      let position = 0
-
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight)
-      heightLeft -= pageHeight
-
-      while (heightLeft > 0) {
-        position -= pageHeight
-        pdf.addPage()
-        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight)
-        heightLeft -= pageHeight
-      }
-
-      const pdfBase64 = pdf.output('datauristring').split(',')[1]
-
-      // 2. Save contract to Supabase
+      // 1. Save contract to Supabase
       const saveRes = await fetch('/api/contracts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -86,11 +51,11 @@ export default function StepPreview({ data, onBack }: Props) {
       }
       const { id: contractId } = await saveRes.json()
 
-      // 3. Send to SignWell (generates signing link and emails client)
+      // 2. Send contract text to server — server generates PDF and calls SignWell
       const sendRes = await fetch(`/api/contracts/${contractId}/trimite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pdfBase64 }),
+        body: JSON.stringify({ contractText }),
       })
 
       if (!sendRes.ok) {
@@ -134,9 +99,7 @@ export default function StepPreview({ data, onBack }: Props) {
           </span>
         </div>
         <div className="max-h-96 overflow-y-auto p-6 bg-white">
-          <div ref={previewRef}>
-            <ContractPreviewContent data={data} onTextReady={handleTextReady} />
-          </div>
+          <ContractPreviewContent data={data} onTextReady={handleTextReady} />
         </div>
       </div>
 
