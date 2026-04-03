@@ -47,7 +47,7 @@ export async function POST(
     const fileName = `dealrooms/${params.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
 
     const { error: uploadError } = await supabase.storage
-      .from('dealroom-docs')
+      .from('documente-proprietati')
       .upload(fileName, buffer, {
         contentType: file.type,
         upsert: false,
@@ -59,7 +59,7 @@ export async function POST(
     }
 
     const { data: urlData } = supabase.storage
-      .from('dealroom-docs')
+      .from('documente-proprietati')
       .getPublicUrl(fileName)
 
     const { data: doc, error: dbError } = await supabase
