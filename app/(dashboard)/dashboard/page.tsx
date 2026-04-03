@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { FileText, Home, TrendingUp, ArrowRight, Plus } from 'lucide-react'
 import { fetchNews } from '@/lib/news'
-import NewsCarousel from '@/components/news/NewsCarousel'
+import NewsDashboardGrid from '@/components/news/NewsDashboardGrid'
 
 export default async function DashboardPage() {
   const supabase = createClient()
@@ -126,10 +126,10 @@ export default async function DashboardPage() {
         })}
       </div>
 
-      {/* News carousel */}
+      {/* News grid */}
       {newsArticles.length > 0 && (
         <div className="mt-8">
-          <NewsCarousel articles={newsArticles} />
+          <NewsDashboardGrid articles={newsArticles} />
         </div>
       )}
 

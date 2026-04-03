@@ -1,10 +1,15 @@
-import { fetchNews } from '@/lib/news'
-import { ExternalLink, Newspaper } from 'lucide-react'
+import { fetchNews, NEWS_FALLBACK_IMAGE } from '@/lib/news'
+import { Newspaper } from 'lucide-react'
 
-function formatDate(pubDate: string): string {
+function relDate(pubDate: string): string {
   if (!pubDate) return ''
   const d = new Date(pubDate)
   if (isNaN(d.getTime())) return ''
+  const h = Math.floor((Date.now() - d.getTime()) / 3600000)
+  if (h < 1) return 'acum câteva minute'
+  if (h < 24) return `acum ${h}h`
+  const days = Math.floor(h / 24)
+  if (days < 7) return `acum ${days}z`
   return d.toLocaleDateString('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
@@ -36,20 +41,14 @@ export default async function StiriPage() {
               className="group bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-md hover:border-blue-200 transition-all flex flex-col"
             >
               {/* Image */}
-              <div className="relative h-44 bg-gradient-to-br from-slate-100 to-slate-200 flex-shrink-0 overflow-hidden">
-                {article.image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={article.image}
-                    alt={article.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Newspaper className="w-12 h-12 text-slate-300" />
-                  </div>
-                )}
+              <div className="relative h-44 overflow-hidden flex-shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={article.image || NEWS_FALLBACK_IMAGE}
+                  alt={article.title}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  onError={e => { (e.currentTarget as HTMLImageElement).src = NEWS_FALLBACK_IMAGE }}
+                />
                 <div className="absolute top-2.5 left-2.5 bg-black/60 backdrop-blur-sm text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
                   {article.source}
                 </div>
@@ -57,10 +56,8 @@ export default async function StiriPage() {
 
               {/* Content */}
               <div className="p-4 flex flex-col flex-1">
-                {article.pubDate && (
-                  <p className="text-xs text-slate-400 mb-1.5">{formatDate(article.pubDate)}</p>
-                )}
-                <h2 className="text-sm font-semibold text-slate-900 leading-snug line-clamp-3 group-hover:text-blue-600 transition-colors flex-1">
+                <p className="text-xs text-slate-400 mb-1.5">{relDate(article.pubDate)}</p>
+                <h2 className="text-sm font-semibold text-slate-900 leading-snug line-clamp-2 group-hover:text-blue-600 transition-colors flex-1">
                   {article.title}
                 </h2>
                 {article.description && (
@@ -68,10 +65,6 @@ export default async function StiriPage() {
                     {article.description}
                   </p>
                 )}
-                <div className="flex items-center gap-1 mt-3 text-xs text-blue-600 font-medium">
-                  <ExternalLink className="w-3 h-3" />
-                  Citește articolul
-                </div>
               </div>
             </a>
           ))}

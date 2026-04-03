@@ -1,5 +1,8 @@
 import { XMLParser } from 'fast-xml-parser'
 
+export const NEWS_FALLBACK_IMAGE =
+  'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=400&q=80'
+
 export interface NewsArticle {
   title: string
   link: string
@@ -29,10 +32,26 @@ const FEEDS: { url: string; source: string }[] = [
 ]
 
 const KEYWORDS = [
-  'imobiliar', 'proprietat', 'apartament', 'casă', 'casa', 'teren',
-  'construcţi', 'constructi', 'dezvoltat', 'ipotecar', 'credit ipotecar',
-  'investiţi', 'investiti', 'locuinţ', 'locuint', 'tranzacţi', 'tranzacti',
-  'bloc', 'ansambl', 'rezidential', 'rezidenţial',
+  'imobiliar',
+  'apartament',
+  'casă', 'casa ',
+  'teren',
+  'proprietate',
+  'ipotecă', 'ipoteca',
+  'credit imobiliar',
+  'dobândă', 'dobanda',
+  ' anl ',
+  'anre',
+  'construcții rezidențiale', 'constructii rezidentiale',
+  'autorizație de construire', 'autorizatie de construire',
+  'piața imobiliară', 'piata imobiliara',
+  'chirie', 'chirii',
+  'dezvoltator imobiliar',
+  'proiect rezidențial', 'proiect rezidential',
+  'bnr dobândă', 'bnr dobanda',
+  'tva imobiliar',
+  'cadastru',
+  'intabulare',
 ]
 
 const parser = new XMLParser({
