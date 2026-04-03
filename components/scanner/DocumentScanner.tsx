@@ -71,7 +71,7 @@ export default function DocumentScanner({ dealrooms, agentId }: Props) {
       }
 
       const pdfBytes = await pdfDoc.save()
-      const pdfBlob = new Blob([pdfBytes as Uint8Array], { type: 'application/pdf' })
+      const pdfBlob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' })
 
       // Upload to Supabase Storage
       const fileName = `${dealroomId}/${Date.now()}-${documentName.trim().replace(/\s+/g, '_')}.pdf`
