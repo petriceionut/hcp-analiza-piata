@@ -1,8 +1,18 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { Home, Plus } from 'lucide-react'
-import { DealRoom, PropertyType } from '@/types'
-import { PROPERTY_ICONS, PROPERTY_TYPES, DEALROOM_STATUS_LABELS, formatDate } from '@/lib/utils'
+import { Home, Plus, UserPlus } from 'lucide-react'
+import { DealRoom } from '@/types'
+import { DEALROOM_STATUS_LABELS, formatDate } from '@/lib/utils'
+
+const STATUS_COLORS: Record<string, string> = {
+  activ:            'bg-green-100 text-green-700',
+  oferta_acceptata: 'bg-amber-100 text-amber-700',
+  inchis:           'bg-gray-100 text-gray-500',
+}
+
+function capitalize(s: string) {
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
 
 export default async function DealRoomListPage() {
   const supabase = createClient()
@@ -10,24 +20,11 @@ export default async function DealRoomListPage() {
 
   const { data: dealrooms } = await supabase
     .from('dealrooms')
-    .select(`
-      *,
-      cumparatori:buyers(count),
-      oferte:offers(count)
-    `)
+    .select('*')
     .eq('agent_id', user?.id)
     .order('created_at', { ascending: false })
 
-  const list = (dealrooms ?? []) as (DealRoom & {
-    cumparatori: [{ count: number }]
-    oferte: [{ count: number }]
-  })[]
-
-  const statusColors: Record<string, string> = {
-    activ: 'bg-green-100 text-green-700',
-    oferta_acceptata: 'bg-amber-100 text-amber-700',
-    inchis: 'bg-gray-100 text-gray-500',
-  }
+  const list = (dealrooms ?? []) as DealRoom[]
 
   return (
     <div className="p-8">
@@ -60,43 +57,42 @@ export default async function DealRoomListPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {list.map((dr) => {
-            const propertyType = dr.tip_proprietate as PropertyType
-            const icon = PROPERTY_ICONS[propertyType]
-            const buyerCount = dr.cumparatori?.[0]?.count ?? 0
-            const offerCount = dr.oferte?.[0]?.count ?? 0
+            const title = [capitalize(dr.tip_proprietate ?? 'Proprietate'), dr.adresa_scurta]
+              .filter(Boolean)
+              .join(' - ')
 
             return (
-              <Link
+              <div
                 key={dr.id}
-                href={`/dealroom/${dr.id}`}
-                className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-emerald-100 transition-all overflow-hidden group"
+                className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col"
               >
-                {/* Icon */}
-                <div className="bg-gradient-to-br from-emerald-500 to-emerald-700 p-8 flex items-center justify-center">
-                  <span className="text-5xl">{icon}</span>
-                </div>
-
-                {/* Content */}
-                <div className="p-5">
-                  <div className="flex items-start justify-between mb-2">
-                    <h3 className="font-semibold text-slate-900 text-sm leading-tight">
-                      {PROPERTY_TYPES[propertyType]}
+                {/* Header */}
+                <Link
+                  href={`/dealroom/${dr.id}`}
+                  className="block p-6 hover:bg-slate-50 transition-colors flex-1"
+                >
+                  <div className="flex items-start justify-between gap-3 mb-1">
+                    <h3 className="text-base font-semibold text-slate-900 leading-snug">
+                      {title}
                     </h3>
-                    <span className={`badge ${statusColors[dr.status]}`}>
-                      {DEALROOM_STATUS_LABELS[dr.status]}
+                    <span className={`shrink-0 text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_COLORS[dr.status] ?? 'bg-gray-100 text-gray-500'}`}>
+                      {DEALROOM_STATUS_LABELS[dr.status] ?? dr.status}
                     </span>
                   </div>
-                  <p className="text-sm text-slate-600 mb-3">{dr.adresa_scurta}</p>
+                  <p className="text-xs text-slate-400 mt-2">{formatDate(dr.created_at)}</p>
+                </Link>
 
-                  <div className="flex items-center gap-4 text-xs text-slate-400">
-                    <span>{buyerCount} cumparator{buyerCount !== 1 ? 'i' : ''}</span>
-                    <span>•</span>
-                    <span>{offerCount} ofert{offerCount !== 1 ? 'e' : 'a'}</span>
-                    <span>•</span>
-                    <span>{formatDate(dr.created_at)}</span>
-                  </div>
+                {/* Footer */}
+                <div className="px-6 pb-5">
+                  <button
+                    type="button"
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-emerald-200 text-emerald-700 text-sm font-medium hover:bg-emerald-50 transition-colors"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    Adaugă vizitator
+                  </button>
                 </div>
-              </Link>
+              </div>
             )
           })}
         </div>
