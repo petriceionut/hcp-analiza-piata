@@ -271,32 +271,61 @@ export async function POST(
     .then(({ error }) => { if (error) console.warn('[semneaza-agent] contracts update failed:', error) })
 
   // 5. Upsert dealrooms entry (best-effort)
-  // NOTE: The DealRoom page queries the 'dealrooms' table (not 'deal_rooms').
+  // Schema: id, contract_id, agent_id (NOT NULL), tip_proprietate, adresa_scurta, status, owner_token
   try {
-    const payload = {
-      contract_id:     sigReq.contract_id,
-      agent_id:        contract?.agent_id ?? null,
-      tip_proprietate: contract?.property_data?.tip_proprietate ?? 'apartament',
-      adresa_scurta:   contract?.property_data?.adresa_imobil
-                         ?? contract?.property_data?.adresa
-                         ?? '',
-      status:          'activ',
-    }
-    console.log('[semneaza-agent] upserting dealrooms payload:', JSON.stringify(payload))
-    const { data: drData, error: dealRoomErr } = await supabase
-      .from('dealrooms')
-      .upsert(payload, { onConflict: 'contract_id' })
-      .select('id')
-      .single()
-    if (dealRoomErr) {
-      console.error('[semneaza-agent] dealrooms upsert FAILED:', {
-        message: dealRoomErr.message,
-        details: dealRoomErr.details,
-        hint:    dealRoomErr.hint,
-        code:    dealRoomErr.code,
-      })
+    const agentId: string | null = contract?.agent_id ?? null
+    console.log(`[semneaza-agent] dealrooms upsert — contract_id=${sigReq.contract_id} agent_id=${agentId}`)
+
+    if (!agentId) {
+      // Fetch agent_id directly from the contracts table as a fallback
+      const { data: contractRow } = await supabase
+        .from('contracts')
+        .select('agent_id')
+        .eq('id', sigReq.contract_id)
+        .single()
+      console.warn('[semneaza-agent] agent_id was null on sigReq.contracts, fetched from contracts:', contractRow?.agent_id)
+      if (!contractRow?.agent_id) {
+        console.error('[semneaza-agent] dealrooms upsert SKIPPED — agent_id is null and could not be resolved')
+        // skip upsert; agent_id is NOT NULL in schema
+      } else {
+        const payload = {
+          contract_id:     sigReq.contract_id,
+          agent_id:        contractRow.agent_id,
+          tip_proprietate: contract?.property_data?.tip_proprietate ?? 'apartament',
+          adresa_scurta:   contract?.property_data?.adresa_imobil ?? contract?.property_data?.adresa ?? '',
+          status:          'activ',
+        }
+        console.log('[semneaza-agent] dealrooms upsert payload (fallback):', JSON.stringify(payload))
+        const { data: drData, error: dealRoomErr } = await supabase
+          .from('dealrooms')
+          .upsert(payload, { onConflict: 'contract_id' })
+          .select('id')
+          .single()
+        if (dealRoomErr) {
+          console.error('[semneaza-agent] dealrooms upsert FAILED:', dealRoomErr.message, dealRoomErr.details, dealRoomErr.hint)
+        } else {
+          console.log(`[semneaza-agent] dealrooms upsert SUCCESS id=${drData?.id}`)
+        }
+      }
     } else {
-      console.log(`[semneaza-agent] dealrooms upsert SUCCESS id=${drData?.id} contract=${sigReq.contract_id}`)
+      const payload = {
+        contract_id:     sigReq.contract_id,
+        agent_id:        agentId,
+        tip_proprietate: contract?.property_data?.tip_proprietate ?? 'apartament',
+        adresa_scurta:   contract?.property_data?.adresa_imobil ?? contract?.property_data?.adresa ?? '',
+        status:          'activ',
+      }
+      console.log('[semneaza-agent] dealrooms upsert payload:', JSON.stringify(payload))
+      const { data: drData, error: dealRoomErr } = await supabase
+        .from('dealrooms')
+        .upsert(payload, { onConflict: 'contract_id' })
+        .select('id')
+        .single()
+      if (dealRoomErr) {
+        console.error('[semneaza-agent] dealrooms upsert FAILED:', dealRoomErr.message, dealRoomErr.details, dealRoomErr.hint)
+      } else {
+        console.log(`[semneaza-agent] dealrooms upsert SUCCESS id=${drData?.id}`)
+      }
     }
   } catch (e) {
     console.error('[semneaza-agent] dealrooms upsert exception (non-fatal):', e)
