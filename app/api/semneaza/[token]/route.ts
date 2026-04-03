@@ -75,8 +75,8 @@ function sanitizeForPdfWithDiag(text: string): string {
   const result = sanitizeForPdf(text)
   if (!_pdfSanitizeDiagDone && text !== result) {
     _pdfSanitizeDiagDone = true
-    const before = [...text].filter(c => c.codePointAt(0)! > 127).slice(0, 8).map(c => `${c}(U+${c.codePointAt(0)!.toString(16).toUpperCase()})`)
-    const after  = [...result].filter(c => c.codePointAt(0)! > 127).slice(0, 8).map(c => `${c}(U+${c.codePointAt(0)!.toString(16).toUpperCase()})`)
+    const before = Array.from(text).filter(c => c.codePointAt(0)! > 127).slice(0, 8).map(c => `${c}(U+${c.codePointAt(0)!.toString(16).toUpperCase()})`)
+    const after  = Array.from(result).filter(c => c.codePointAt(0)! > 127).slice(0, 8).map(c => `${c}(U+${c.codePointAt(0)!.toString(16).toUpperCase()})`)
     console.log('[pdf-sanitize] non-ASCII before:', before.join(' '), '| after:', after.join(' '))
   }
   return result
