@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { DealRoom, DealRoomDocument, Buyer, Offer, DealRoomClient, DocumentScanat } from '@/types'
 import { formatDate, formatCurrency, formatDateTime } from '@/lib/utils'
 import {
@@ -39,6 +40,7 @@ export default function DealRoomAgentDashboard({
   clienti,
   documenteScanate,
 }: Props) {
+  const supabase = createClient()
   const [activeTab, setActiveTab] = useState<Tab>('documente')
   const [docs, setDocs] = useState(initialDocs)
   const [buyers, setBuyers] = useState(initialBuyers)
@@ -225,16 +227,22 @@ export default function DealRoomAgentDashboard({
                       {doc.nr_pagini} {doc.nr_pagini === 1 ? 'pagină' : 'pagini'} · {formatDate(doc.created_at)}
                     </p>
                   </div>
-                  <a
-                    href={doc.file_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    download={`${doc.file_name}.pdf`}
+                  <button
                     className="flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-800 transition-colors"
+                    onClick={async () => {
+                      // Extract storage path from stored URL
+                      const path = doc.file_url.split('/documente-proprietati/')[1]
+                      if (!path) { toast.error('URL invalid'); return }
+                      const { data, error } = await supabase.storage
+                        .from('documente-proprietati')
+                        .createSignedUrl(path, 3600)
+                      if (error || !data?.signedUrl) { toast.error('Nu se poate genera link-ul'); return }
+                      window.open(data.signedUrl, '_blank')
+                    }}
                   >
                     <Download className="w-3.5 h-3.5" />
                     Descarcă
-                  </a>
+                  </button>
                 </div>
               ))}
             </div>

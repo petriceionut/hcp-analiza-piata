@@ -194,8 +194,10 @@ export default function DocumentScanner({ dealrooms, agentId }: Props) {
     try {
       const pdfDoc = await PDFDocument.create()
       for (const dataUrl of pages) {
-        const b64 = dataUrl.split(',')[1]
-        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
+        // Use fetch to decode data URL — more reliable than atob for large images
+        const res = await fetch(dataUrl)
+        const arrayBuffer = await res.arrayBuffer()
+        const bytes = new Uint8Array(arrayBuffer)
         const image = dataUrl.includes('image/png')
           ? await pdfDoc.embedPng(bytes)
           : await pdfDoc.embedJpg(bytes)
@@ -203,7 +205,11 @@ export default function DocumentScanner({ dealrooms, agentId }: Props) {
         page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height })
       }
       const pdfBytes = await pdfDoc.save()
-      const pdfBlob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' })
+      // Slice the exact bytes from the buffer — avoids padding in shared ArrayBuffers
+      const pdfBlob = new Blob(
+        [pdfBytes.buffer.slice(pdfBytes.byteOffset, pdfBytes.byteOffset + pdfBytes.byteLength)],
+        { type: 'application/pdf' }
+      )
 
       const fileName = `${dr.id}/${Date.now()}-${docName.trim().replace(/\s+/g, '_')}.pdf`
       const { error: upErr } = await supabase.storage
