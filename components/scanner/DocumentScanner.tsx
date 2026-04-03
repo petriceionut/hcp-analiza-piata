@@ -207,7 +207,7 @@ export default function DocumentScanner({ dealrooms, agentId }: Props) {
       const pdfBytes = await pdfDoc.save()
       // Slice the exact bytes from the buffer — avoids padding in shared ArrayBuffers
       const pdfBlob = new Blob(
-        [pdfBytes.buffer.slice(pdfBytes.byteOffset, pdfBytes.byteOffset + pdfBytes.byteLength)],
+        [pdfBytes.buffer.slice(pdfBytes.byteOffset, pdfBytes.byteOffset + pdfBytes.byteLength) as ArrayBuffer],
         { type: 'application/pdf' }
       )
 
