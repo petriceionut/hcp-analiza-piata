@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
@@ -8,23 +8,26 @@ import { Building2, Eye, EyeOff, Lock, Mail, Zap } from 'lucide-react'
 
 const IS_DEV = process.env.NODE_ENV === 'development'
 
-export default function LoginPage() {
-  const [email, setEmail]             = useState('')
-  const [password, setPassword]       = useState('')
-  const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading]         = useState(false)
-  const [devLoading, setDevLoading]   = useState(false)
-  const router      = useRouter()
+// Isolated so useSearchParams() is inside a Suspense boundary
+function DevAutoLogin({ onTrigger }: { onTrigger: () => void }) {
   const searchParams = useSearchParams()
-  const supabase    = createClient()
-
-  // Auto-trigger dev login when ?dev=true (development only)
   useEffect(() => {
     if (IS_DEV && searchParams.get('dev') === 'true') {
-      handleDevLogin()
+      onTrigger()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  return null
+}
+
+export default function LoginPage() {
+  const [email, setEmail]               = useState('')
+  const [password, setPassword]         = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading]           = useState(false)
+  const [devLoading, setDevLoading]     = useState(false)
+  const router   = useRouter()
+  const supabase = createClient()
 
   const handleDevLogin = async () => {
     if (!IS_DEV) return
@@ -61,6 +64,11 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex items-center justify-center p-4">
+      {/* Suspense boundary required by Next.js for useSearchParams() */}
+      <Suspense fallback={null}>
+        <DevAutoLogin onTrigger={handleDevLogin} />
+      </Suspense>
+
       {/* Background pattern */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute inset-0" style={{
