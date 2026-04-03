@@ -1,15 +1,18 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { FileText, Home, TrendingUp, ArrowRight, Plus } from 'lucide-react'
+import { fetchNews } from '@/lib/news'
+import NewsCarousel from '@/components/news/NewsCarousel'
 
 export default async function DashboardPage() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Fetch stats
-  const [{ count: contracteCount }, { count: dealroomCount }] = await Promise.all([
+  // Fetch stats + news in parallel
+  const [{ count: contracteCount }, { count: dealroomCount }, newsArticles] = await Promise.all([
     supabase.from('contracts').select('*', { count: 'exact', head: true }).eq('agent_id', user?.id),
     supabase.from('dealrooms').select('*', { count: 'exact', head: true }).eq('agent_id', user?.id),
+    fetchNews(15).catch(() => []),
   ])
 
   const modules = [
@@ -122,6 +125,13 @@ export default async function DashboardPage() {
           )
         })}
       </div>
+
+      {/* News carousel */}
+      {newsArticles.length > 0 && (
+        <div className="mt-8">
+          <NewsCarousel articles={newsArticles} />
+        </div>
+      )}
 
       {/* Quick actions */}
       <div className="mt-8 bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
