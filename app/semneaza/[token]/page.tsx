@@ -1,23 +1,40 @@
-import { createAdminClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
+import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
-import SignatureRequestPage from '@/components/semnatura/SignatureRequestPage'
+import ClientSigningView from './ClientSigningView'
+
+function adminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+}
 
 export default async function SemneazaPage({
   params,
 }: {
   params: { token: string }
 }) {
-  const supabase = createAdminClient()
+  const supabase = adminClient()
 
-  const { data, error } = await supabase
+  const { data: sigReq, error } = await supabase
     .from('signature_requests')
-    .select('token, client_name, contract_text, status')
+    .select(`
+      id, token, status, client_name, client_email,
+      contract_text, signed_at, device_info, signer_ip,
+      contract_id,
+      contracts (
+        client_data,
+        property_data,
+        tip_contract
+      )
+    `)
     .eq('token', params.token)
     .single()
 
-  if (error || !data) notFound()
+  if (error || !sigReq) notFound()
 
-  if (data.status === 'signed') {
+  if (sigReq.status === 'semnat_client' || sigReq.status === 'semnat_complet') {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 max-w-md w-full text-center">
@@ -33,11 +50,44 @@ export default async function SemneazaPage({
     )
   }
 
+  const headersList = headers()
+  const ip = headersList.get('x-forwarded-for')?.split(',')[0]?.trim()
+    ?? headersList.get('x-real-ip')
+    ?? 'necunoscut'
+  const ua = headersList.get('user-agent') ?? ''
+  const device = parseUserAgent(ua)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const contractData = sigReq.contracts as any
+  const telefon: string = contractData?.client_data?.telefon ?? ''
+
   return (
-    <SignatureRequestPage
-      token={data.token}
-      clientName={data.client_name}
-      contractText={data.contract_text}
+    <ClientSigningView
+      token={sigReq.token}
+      contractText={sigReq.contract_text}
+      clientName={sigReq.client_name}
+      clientEmail={sigReq.client_email}
+      telefon={telefon}
+      ip={ip}
+      device={device}
     />
   )
+}
+
+function parseUserAgent(ua: string): string {
+  let browser = 'Browser'
+  if (ua.includes('Edg/'))      browser = `Edge ${ua.match(/Edg\/(\d+)/)?.[1] ?? ''}`
+  else if (ua.includes('Chrome')) browser = `Chrome ${ua.match(/Chrome\/(\d+)/)?.[1] ?? ''}`
+  else if (ua.includes('Firefox')) browser = `Firefox ${ua.match(/Firefox\/(\d+)/)?.[1] ?? ''}`
+  else if (ua.includes('Safari'))  browser = `Safari ${ua.match(/Version\/(\d+)/)?.[1] ?? ''}`
+
+  let os = 'OS'
+  if (ua.includes('Windows NT 10.0')) os = 'Windows 10/11'
+  else if (ua.includes('Windows'))     os = 'Windows'
+  else if (ua.includes('Mac OS X'))    os = 'macOS'
+  else if (ua.includes('Android'))     os = `Android ${ua.match(/Android (\d+)/)?.[1] ?? ''}`
+  else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS'
+  else if (ua.includes('Linux'))       os = 'Linux'
+
+  return `${browser} / ${os}`
 }

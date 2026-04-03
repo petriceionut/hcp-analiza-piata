@@ -34,6 +34,7 @@ export async function middleware(request: NextRequest) {
   const publicRoutes = [
     '/login',
     '/semneaza',
+    '/semneaza-agent',
     '/dealroom-client',
     '/oferta-acceptata',
     '/api/',
