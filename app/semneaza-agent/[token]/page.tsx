@@ -48,14 +48,8 @@ export default async function SemneazaAgentPage({
     .select(`
       id, token, status,
       client_name, client_email, contract_text,
-      signed_at, signer_ip, device_info, pdf_url,
-      contract_id,
-      contracts (
-        client_data,
-        property_data,
-        tip_contract,
-        agent_id
-      )
+      signed_at, signer_ip,
+      contracts ( client_data )
     `)
     .eq('token', params.token)
     .single()
@@ -90,16 +84,6 @@ export default async function SemneazaAgentPage({
           </div>
           <h1 className="text-xl font-bold text-slate-900 mb-2">Contract semnat complet</h1>
           <p className="text-slate-500">Ambele părți au semnat documentul.</p>
-          {sigReq.pdf_url && (
-            <a
-              href={sigReq.pdf_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 mt-6 px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
-            >
-              Descarcă PDF final
-            </a>
-          )}
         </div>
       </div>
     )
@@ -121,7 +105,7 @@ export default async function SemneazaAgentPage({
         email:    sigReq.client_email,
         telefon:  contract?.client_data?.telefon ?? '',
         ip:       sigReq.signer_ip ?? '',
-        device:   sigReq.device_info ?? '',
+        device:   '',
         signedAt: formatDateTime(sigReq.signed_at),
       }
     : null
@@ -132,7 +116,7 @@ export default async function SemneazaAgentPage({
       contractText={sigReq.contract_text}
       clientSignedBlock={clientSignedBlock}
       agentName="Petrice Ioan"
-      agentEmail="joan.petrice@homoecapital.ro"
+      agentEmail="ionutpetrice1224@gmail.com"
       agentIp={ip}
       agentDevice={device}
     />

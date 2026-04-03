@@ -40,14 +40,24 @@ function parseUserAgent(ua: string): string {
   return `${browser} / ${os}`
 }
 
-// ── Transliterate Romanian characters to ASCII for Helvetica compatibility ────
-function ro(text: string): string {
+// ── Sanitize text for jsPDF WinAnsi (Latin-1) encoding ───────────────────────
+function sanitizeForPdf(text: string): string {
   return text
+    // Romanian characters → ASCII
     .replace(/[ț]/g, 't').replace(/[Ț]/g, 'T')
     .replace(/[ș]/g, 's').replace(/[Ș]/g, 'S')
     .replace(/[ă]/g, 'a').replace(/[Ă]/g, 'A')
     .replace(/[î]/g, 'i').replace(/[Î]/g, 'I')
     .replace(/[â]/g, 'a').replace(/[Â]/g, 'A')
+    // Typographic quotes and dashes → plain ASCII
+    .replace(/[\u201C\u201D\u201E]/g, '"')
+    .replace(/[\u2018\u2019\u201A]/g, "'")
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/\u2026/g, '...')
+    .replace(/\u00A0/g, ' ')
+    // Strip any remaining characters outside Latin-1 (code points > 255)
+    // eslint-disable-next-line no-control-regex
+    .replace(/[^\x00-\xFF]/g, '?')
 }
 
 // ── PDF generation using jsPDF (pure JS, no filesystem) ──────────────────────
@@ -71,9 +81,10 @@ async function generatePDF(
   // ── Contract text ──────────────────────────────────────────────────────────
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(10)
+  doc.setCharSpace(0)
 
   for (const rawLine of contractText.split('\n')) {
-    const wrapped = doc.splitTextToSize(ro(rawLine) || ' ', maxW)
+    const wrapped = doc.splitTextToSize(sanitizeForPdf(rawLine) || ' ', maxW)
     for (const line of wrapped) {
       checkPage()
       doc.text(line, margin, y)
@@ -93,11 +104,11 @@ async function generatePDF(
 
   doc.setFont('helvetica', 'normal')
   const sigLines = [
-    `Semnat electronic de: ${ro(client.name)}`,
+    `Semnat electronic de: ${sanitizeForPdf(client.name)}`,
     `Email: ${client.email}`,
     ...(client.telefon ? [`Telefon: ${client.telefon}`] : []),
     `Adresa IP: ${client.ip}`,
-    `Dispozitiv: ${ro(client.device)}`,
+    `Dispozitiv: ${sanitizeForPdf(client.device)}`,
     `Data si ora: ${client.signedAt}`,
   ]
   for (const sl of sigLines) {
@@ -202,10 +213,11 @@ export async function POST(
   }
 
   // 6. Update contracts status
-  const { error: contractErr } = await supabase
+  const { error: contractErr, count: contractCount } = await supabase
     .from('contracts')
-    .update({ status: 'semnat_client' })
+    .update({ status: 'semnat_client' }, { count: 'exact' })
     .eq('id', sigReq.contract_id)
+  console.log(`[semneaza] contracts update: contract_id=${sigReq.contract_id} rows=${contractCount} err=${contractErr?.message ?? 'none'}`)
   if (contractErr) console.error('[semneaza] contracts status update failed:', contractErr)
 
   // 7. Email agent with agent signing link
