@@ -101,9 +101,24 @@ function extractImage(item: Record<string, unknown>): string {
   return ''
 }
 
+const EXCLUDE_KEYWORDS = [
+  'nato', 'militar', 'apărare', 'aparare', 'diplomat', 'ministrul de externe',
+  'război', 'razboi', 'conflict armat', 'rusia', 'ucraina', 'sua ', 'trump',
+  'zelenski', 'alegeri', 'partid', 'parlament', 'guvern', 'ministru',
+  'premier', 'presedinte', 'președinte', 'coalitie', 'coaliție',
+]
+
 function matchesKeywords(title: string, desc: string): boolean {
-  const text = (title + ' ' + desc).toLowerCase()
-  return KEYWORDS.some(kw => text.includes(kw))
+  const titleLow = title.toLowerCase()
+  const descLow = desc.toLowerCase()
+
+  // Exclude first — if title OR description contains an exclusion term, reject
+  const combined = titleLow + ' ' + descLow
+  if (EXCLUDE_KEYWORDS.some(kw => combined.includes(kw))) return false
+
+  // Require a match in BOTH title checked first, then description as fallback
+  return KEYWORDS.some(kw => titleLow.includes(kw)) ||
+    KEYWORDS.some(kw => descLow.includes(kw))
 }
 
 async function fetchFeed(feed: { url: string; source: string }): Promise<NewsArticle[]> {

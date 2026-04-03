@@ -14,7 +14,12 @@ function relDate(pubDate: string): string {
 }
 
 export default async function StiriPage() {
-  const articles = await fetchNews(15)
+  let articles = []
+  try {
+    articles = await fetchNews(15)
+  } catch {
+    // fetchNews failed entirely — show empty state
+  }
 
   return (
     <div className="p-8">
