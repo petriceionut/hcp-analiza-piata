@@ -20,14 +20,8 @@ export default async function SemneazaPage({
   const { data: sigReq, error } = await supabase
     .from('signature_requests')
     .select(`
-      id, token, status, client_name, client_email,
-      contract_text, signed_at, device_info, signer_ip,
-      contract_id,
-      contracts (
-        client_data,
-        property_data,
-        tip_contract
-      )
+      token, status, client_name, client_email, contract_text,
+      contracts ( client_data )
     `)
     .eq('token', params.token)
     .single()
