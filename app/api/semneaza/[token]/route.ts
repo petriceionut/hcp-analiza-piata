@@ -41,10 +41,13 @@ function parseUserAgent(ua: string): string {
 }
 
 // ── Sanitize text for jsPDF WinAnsi (Latin-1) encoding ───────────────────────
-// Use explicit Unicode escapes to avoid source-encoding ambiguity.
-// Handles both Romanian Unicode variants (e.g. U+0219 ș and U+015F ş).
-function sanitizeForPdf(text: string): string {
-  return text
+// 1. NFC-normalise first so decomposed chars (e.g. s + U+0326) become
+//    composed codepoints (U+0219 ș) that the regexes can match.
+// 2. Explicit Unicode escapes for both Romanian variants of ș/ț.
+// 3. Final strip of anything outside Latin-1 that slipped through.
+function sanitizeForPdfWithDiag(text: string): string {
+  const nfc = text.normalize('NFC')
+  const out = nfc
     // ț (U+021B) and ţ (U+0163) → t
     .replace(/[\u021B\u0163]/g, 't').replace(/[\u021A\u0162]/g, 'T')
     // ș (U+0219) and ş (U+015F) → s
@@ -64,6 +67,19 @@ function sanitizeForPdf(text: string): string {
     // Strip any remaining characters outside Latin-1 (code points > 255)
     // eslint-disable-next-line no-control-regex
     .replace(/[^\x00-\xFF]/g, '?')
+  return out
+}
+
+let _pdfSanitizeDiagDone = false
+function sanitizeForPdfWithDiag(text: string): string {
+  const result = sanitizeForPdfWithDiag(text)
+  if (!_pdfSanitizeDiagDone && text !== result) {
+    _pdfSanitizeDiagDone = true
+    const before = [...text].filter(c => c.codePointAt(0)! > 127).slice(0, 8).map(c => `${c}(U+${c.codePointAt(0)!.toString(16).toUpperCase()})`)
+    const after  = [...result].filter(c => c.codePointAt(0)! > 127).slice(0, 8).map(c => `${c}(U+${c.codePointAt(0)!.toString(16).toUpperCase()})`)
+    console.log('[pdf-sanitize] non-ASCII before:', before.join(' '), '| after:', after.join(' '))
+  }
+  return result
 }
 
 // ── PDF generation using jsPDF (pure JS, no filesystem) ──────────────────────
@@ -90,7 +106,7 @@ async function generatePDF(
   doc.setCharSpace(0)
 
   for (const rawLine of contractText.split('\n')) {
-    const wrapped = doc.splitTextToSize(sanitizeForPdf(rawLine) || ' ', maxW)
+    const wrapped = doc.splitTextToSize(sanitizeForPdfWithDiag(rawLine) || ' ', maxW)
     for (const line of wrapped) {
       checkPage()
       doc.text(line, margin, y)
@@ -110,11 +126,11 @@ async function generatePDF(
 
   doc.setFont('helvetica', 'normal')
   const sigLines = [
-    `Semnat electronic de: ${sanitizeForPdf(client.name)}`,
+    `Semnat electronic de: ${sanitizeForPdfWithDiag(client.name)}`,
     `Email: ${client.email}`,
     ...(client.telefon ? [`Telefon: ${client.telefon}`] : []),
     `Adresa IP: ${client.ip}`,
-    `Dispozitiv: ${sanitizeForPdf(client.device)}`,
+    `Dispozitiv: ${sanitizeForPdfWithDiag(client.device)}`,
     `Data si ora: ${client.signedAt}`,
   ]
   for (const sl of sigLines) {

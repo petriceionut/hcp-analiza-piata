@@ -242,20 +242,25 @@ export async function POST(
     console.error('[semneaza-agent] PDF generation failed (non-fatal):', e)
   }
 
-  // 3. Update signature_requests — only v1 columns
+  // 3. Update signature_requests — only v1 columns (id, status, signed_at, signer_ip)
+  // device_info is a v2-only column; omit it to avoid "column does not exist" errors.
   const { error: updateErr } = await supabase
     .from('signature_requests')
     .update({
       status:    'signed',
       signed_at: agentSignedAt.toISOString(),
       signer_ip: ip,
-      device_info: device,
     })
     .eq('id', sigReq.id)
 
   if (updateErr) {
-    console.error('[semneaza-agent] update failed:', updateErr)
-    return NextResponse.json({ error: 'Eroare la salvarea semnăturii agentului' }, { status: 500 })
+    console.error('[semneaza-agent] signature_requests update failed:', {
+      message: updateErr.message,
+      details: updateErr.details,
+      hint:    updateErr.hint,
+      code:    updateErr.code,
+    })
+    return NextResponse.json({ error: 'Eroare la salvarea semnăturii agentului', detail: updateErr.message }, { status: 500 })
   }
 
   // 4. Update contracts status (best-effort)

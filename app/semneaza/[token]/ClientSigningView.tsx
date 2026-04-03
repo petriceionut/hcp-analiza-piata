@@ -111,14 +111,27 @@ export default function ClientSigningView({
               lineHeight: '1.7',
               fontFamily: 'Arial, Helvetica, sans-serif',
               color: '#111',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
               maxHeight: '70vh',
               overflowY: 'auto',
-              textAlign: 'left',
             }}
           >
-            {contractText.replace(/\bNaN\b/g, '______')}
+            {contractText
+              .replace(/\bNaN\b/g, '______')
+              .split('\n')
+              .map((line, i) => (
+                <p
+                  key={i}
+                  style={{
+                    whiteSpace: 'normal',
+                    wordBreak: 'break-word',
+                    textAlign: 'left',
+                    margin: 0,
+                    minHeight: line.trim() === '' ? '1em' : undefined,
+                  }}
+                >
+                  {line || '\u00A0'}
+                </p>
+              ))}
           </div>
         </div>
 
