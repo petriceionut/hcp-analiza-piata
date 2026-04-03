@@ -106,18 +106,19 @@ export default function ClientSigningView({
           </div>
           <div
             style={{
-              padding: '2.5cm',
-              fontSize: '11pt',
-              lineHeight: '1.4',
+              padding: '40px 60px',
+              fontSize: '16px',
+              lineHeight: '1.7',
               fontFamily: 'Arial, Helvetica, sans-serif',
-              color: '#000',
+              color: '#111',
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',
-              maxHeight: '60vh',
+              maxHeight: '70vh',
               overflowY: 'auto',
+              textAlign: 'left',
             }}
           >
-            {contractText}
+            {contractText.replace(/\bNaN\b/g, '______')}
           </div>
         </div>
 

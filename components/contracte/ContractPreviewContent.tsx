@@ -77,14 +77,14 @@ function applyPlaceholders(text: string, data: WizardData): string {
     '{{NR_CADASTRAL}}':      property.nr_cadastral        ?? '______',
 
     // Contract conditions
-    '{{COMISION}}':          data.comision      != null ? String(data.comision)      : '____',
-    '{{DURATA}}':            data.durata        != null ? String(data.durata)        : '__',
-    '{{DATA_EXPIRARE}}':     data.durata        != null ? computeExpiryDate(data.durata) : '______',
+    '{{COMISION}}':          Number.isFinite(Number(data.comision))      ? String(data.comision)      : '____',
+    '{{DURATA}}':            Number.isFinite(Number(data.durata))        ? String(data.durata)        : '__',
+    '{{DATA_EXPIRARE}}':     Number.isFinite(Number(data.durata))        ? computeExpiryDate(data.durata!) : '______',
     '{{DATA_INCEPERE}}':     data.dataIncepere  ? formatDate(data.dataIncepere)  : '______',
     '{{VICII_CUNOSCUTE}}':   data.viciiCunoscute  || '—',
-    '{{PRET_MINIM}}':        data.pretMinim       != null ? String(data.pretMinim)       : '______',
+    '{{PRET_MINIM}}':        Number.isFinite(Number(data.pretMinim))       ? String(data.pretMinim)       : '______',
     '{{CLARIFICARI}}':       data.clarificari     || '—',
-    '{{CHELTUIELI_LUNARE}}': data.cheltuieliLunare != null ? String(data.cheltuieliLunare) : '______',
+    '{{CHELTUIELI_LUNARE}}': Number.isFinite(Number(data.cheltuieliLunare)) ? String(data.cheltuieliLunare) : '______',
 
     // Dates / metadata
     '{{DATA_SEMNARII}}':     today,

@@ -28,7 +28,7 @@ export default async function SemneazaPage({
 
   if (error || !sigReq) notFound()
 
-  if (sigReq.status === 'semnat_client' || sigReq.status === 'semnat_complet') {
+  if (sigReq.status === 'signed' || sigReq.status === 'semnat_client' || sigReq.status === 'semnat_complet') {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 max-w-md w-full text-center">

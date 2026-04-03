@@ -152,7 +152,7 @@ export async function POST(
   if (fetchErr || !sigReq) {
     return NextResponse.json({ error: 'Link invalid sau expirat' }, { status: 404 })
   }
-  if (sigReq.status === 'semnat_client' || sigReq.status === 'semnat_complet') {
+  if (sigReq.status === 'signed' || sigReq.status === 'semnat_client' || sigReq.status === 'semnat_complet') {
     return NextResponse.json({ error: 'Document deja semnat' }, { status: 409 })
   }
 
@@ -176,15 +176,13 @@ export async function POST(
     console.error('[semneaza] PDF generation failed (non-fatal):', e)
   }
 
-  // 5. Update signature_requests
+  // 5. Update signature_requests — only columns present in v1 migration
   const { error: updateErr } = await supabase
     .from('signature_requests')
     .update({
-      status:      'semnat_client',
-      signed_at:   signedAt.toISOString(),
-      signer_ip:   ip,
-      device_info: device,
-      pdf_url:     pdfUrl,
+      status:    'signed',
+      signed_at: signedAt.toISOString(),
+      signer_ip: ip,
     })
     .eq('id', sigReq.id)
 
