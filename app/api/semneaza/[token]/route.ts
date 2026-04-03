@@ -234,10 +234,10 @@ export async function POST(
     return NextResponse.json({ error: 'Eroare la salvarea semnăturii' }, { status: 500 })
   }
 
-  // 6. Update contracts status
+  // 6. Update contracts status + client signing timestamp
   const { error: contractErr, count: contractCount } = await supabase
     .from('contracts')
-    .update({ status: 'semnat_client' }, { count: 'exact' })
+    .update({ status: 'semnat_client', client_semnat_la: signedAt.toISOString() }, { count: 'exact' })
     .eq('id', sigReq.contract_id)
   console.log(`[semneaza] contracts update: contract_id=${sigReq.contract_id} rows=${contractCount} err=${contractErr?.message ?? 'none'}`)
   if (contractErr) console.error('[semneaza] contracts status update failed:', contractErr)

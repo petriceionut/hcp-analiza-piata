@@ -263,27 +263,30 @@ export async function POST(
     return NextResponse.json({ error: 'Eroare la salvarea semnăturii agentului', detail: updateErr.message }, { status: 500 })
   }
 
-  // 4. Update contracts status (best-effort)
+  // 4. Update contracts status + agent signing timestamp (best-effort)
   await supabase
     .from('contracts')
-    .update({ status: 'semnat_ambele' })
+    .update({ status: 'semnat_ambele', agent_semnat_la: agentSignedAt.toISOString() })
     .eq('id', sigReq.contract_id)
     .then(({ error }) => { if (error) console.warn('[semneaza-agent] contracts update failed:', error) })
 
-  // 5. Create DealRoom entry (best-effort)
+  // 5. Upsert DealRoom entry (best-effort)
   try {
     if (contract?.agent_id) {
-      await supabase.from('dealrooms').insert({
-        contract_id:     sigReq.contract_id,
-        agent_id:        contract.agent_id,
-        tip_proprietate: contract.property_data?.tip_proprietate ?? 'apartament',
-        adresa_scurta:   contract.property_data?.adresa ?? '',
-        status:          'activ',
-      })
-      console.log(`[semneaza-agent] DealRoom created for contract ${sigReq.contract_id}`)
+      await supabase.from('dealrooms').upsert(
+        {
+          contract_id:     sigReq.contract_id,
+          agent_id:        contract.agent_id,
+          tip_proprietate: contract.property_data?.tip_proprietate ?? 'apartament',
+          adresa_scurta:   contract.property_data?.adresa ?? '',
+          status:          'activ',
+        },
+        { onConflict: 'contract_id' },
+      )
+      console.log(`[semneaza-agent] DealRoom upserted for contract ${sigReq.contract_id}`)
     }
   } catch (e) {
-    console.warn('[semneaza-agent] DealRoom creation failed (non-fatal):', e)
+    console.warn('[semneaza-agent] DealRoom upsert failed (non-fatal):', e)
   }
 
   // 6. Send completion emails to both parties

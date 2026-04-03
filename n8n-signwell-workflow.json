@@ -1,0 +1,65 @@
+{
+  "name": "SignWell - Trimite Contract",
+  "nodes": [
+    {
+      "id": "a1b2c3d4-0001-0001-0001-000000000001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "parameters": {
+        "path": "signwell-trimite",
+        "httpMethod": "POST",
+        "responseMode": "lastNode",
+        "responseData": "allEntries"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0002-0002-0002-000000000002",
+      "name": "Encode contract to Base64",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300],
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst contractText = input.contractText || 'Contract';\nconst contractTextBase64 = Buffer.from(contractText, 'utf-8').toString('base64');\nreturn [{\n  json: {\n    contractTextBase64,\n    clientEmail: input.clientEmail || '',\n    clientName:  input.clientName  || 'Client',\n    contractId:  input.contractId  || ''\n  }\n}];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0003-0003-0003-000000000003",
+      "name": "SignWell API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [750, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.signwell.com/api/v1/documents/",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Token",
+              "value": "YWNjZXNzOmY0YjdkNzUxYzkzZDUyNGI5MzdmNGUzYTc1ZGU3YWE0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"test_mode\": false,\n  \"draft\": false,\n  \"name\": \"Contract {{ $json.contractId }}\",\n  \"due_date\": \"{{ new Date(Date.now() + 14*86400000).toISOString().split('T')[0] }}\",\n  \"files\": [{\n    \"name\": \"contract.txt\",\n    \"base64_file_contents\": \"{{ $json.contractTextBase64 }}\"\n  }],\n  \"recipients\": [{\n    \"id\": \"1\",\n    \"name\": \"{{ $json.clientName }}\",\n    \"email\": \"{{ $json.clientEmail }}\"\n  }]\n}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Encode contract to Base64", "type": "main", "index": 0 }]]
+    },
+    "Encode contract to Base64": {
+      "main": [[{ "node": "SignWell API", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
