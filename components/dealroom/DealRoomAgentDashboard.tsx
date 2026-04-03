@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { DealRoom, DealRoomDocument, Buyer, Offer } from '@/types'
+import { DealRoom, DealRoomDocument, Buyer, Offer, DealRoomClient } from '@/types'
 import { formatDate, formatCurrency, formatDateTime } from '@/lib/utils'
 import {
   Upload,
@@ -23,6 +23,7 @@ interface Props {
   documente: DealRoomDocument[]
   cumparatori: Buyer[]
   oferte: (Offer & { buyer: { nume: string; prenume: string } })[]
+  clienti: DealRoomClient[]
 }
 
 type Tab = 'documente' | 'cumparatori' | 'oferte'
@@ -32,6 +33,7 @@ export default function DealRoomAgentDashboard({
   documente: initialDocs,
   cumparatori: initialBuyers,
   oferte: initialOffers,
+  clienti,
 }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('documente')
   const [docs, setDocs] = useState(initialDocs)
@@ -125,7 +127,7 @@ export default function DealRoomAgentDashboard({
 
   const tabs: { id: Tab; label: string; count: number; icon: React.ElementType }[] = [
     { id: 'documente', label: 'Documente', count: docs.length, icon: FileText },
-    { id: 'cumparatori', label: 'Cumparatori', count: buyers.length, icon: Users },
+    { id: 'cumparatori', label: 'Cumparatori', count: buyers.length + clienti.length, icon: Users },
     { id: 'oferte', label: 'Oferte', count: offers.length, icon: Euro },
   ]
 
@@ -263,12 +265,34 @@ export default function DealRoomAgentDashboard({
             </div>
           )}
 
-          {buyers.length === 0 ? (
+          {/* Clients added via "Adaugă client" modal */}
+          {clienti.length > 0 && (
+            <div className="space-y-2">
+              {clienti.map((client) => (
+                <div key={client.id} className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-4">
+                  <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-semibold text-blue-600">
+                    {client.prenume?.[0] ?? '?'}{client.nume?.[0] ?? '?'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-900">{client.prenume} {client.nume}</p>
+                    <p className="text-xs text-slate-500">{client.telefon}{client.email ? ` • ${client.email}` : ''}</p>
+                    {(client.data_vizionare || client.ora_vizionare) && (
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Vizionare: {client.data_vizionare ?? ''}{client.data_vizionare && client.ora_vizionare ? ' ' : ''}{client.ora_vizionare ?? ''}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {buyers.length === 0 && clienti.length === 0 ? (
             <div className="bg-white rounded-xl border border-gray-100 p-10 text-center">
               <Users className="w-8 h-8 text-gray-300 mx-auto mb-3" />
               <p className="text-sm text-gray-500">Niciun cumparator adaugat</p>
             </div>
-          ) : (
+          ) : buyers.length > 0 ? (
             <div className="space-y-2">
               {buyers.map((buyer) => (
                 <div key={buyer.id} className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-4">
@@ -286,7 +310,7 @@ export default function DealRoomAgentDashboard({
                 </div>
               ))}
             </div>
-          )}
+          ) : null}
         </div>
       )}
 

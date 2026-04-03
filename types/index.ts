@@ -108,6 +108,18 @@ export interface Buyer {
   added_at: string
 }
 
+export interface DealRoomClient {
+  id: string
+  dealroom_id: string
+  nume: string
+  prenume: string
+  telefon: string
+  email: string
+  data_vizionare: string | null
+  ora_vizionare: string | null
+  created_at: string
+}
+
 export interface Offer {
   id: string
   dealroom_id: string
