@@ -270,31 +270,36 @@ export async function POST(
     .eq('id', sigReq.contract_id)
     .then(({ error }) => { if (error) console.warn('[semneaza-agent] contracts update failed:', error) })
 
-  // 5. Upsert deal_rooms entry (best-effort)
+  // 5. Upsert dealrooms entry (best-effort)
+  // NOTE: The DealRoom page queries the 'dealrooms' table (not 'deal_rooms').
   try {
-    const propertyAddress: string =
-      contract?.property_data?.adresa_imobil ??
-      contract?.property_data?.property_address ??
-      contract?.property_data?.adresa ??
-      ''
-    const clientName: string = sigReq.client_name ?? ''
-
-    const { error: dealRoomErr } = await supabase.from('deal_rooms').upsert(
-      {
-        contract_id:      sigReq.contract_id,
-        property_address: propertyAddress,
-        client_name:      clientName,
-        status:           'activ',
-      },
-      { onConflict: 'contract_id' },
-    )
+    const payload = {
+      contract_id:     sigReq.contract_id,
+      agent_id:        contract?.agent_id ?? null,
+      tip_proprietate: contract?.property_data?.tip_proprietate ?? 'apartament',
+      adresa_scurta:   contract?.property_data?.adresa_imobil
+                         ?? contract?.property_data?.adresa
+                         ?? '',
+      status:          'activ',
+    }
+    console.log('[semneaza-agent] upserting dealrooms payload:', JSON.stringify(payload))
+    const { data: drData, error: dealRoomErr } = await supabase
+      .from('dealrooms')
+      .upsert(payload, { onConflict: 'contract_id' })
+      .select('id')
+      .single()
     if (dealRoomErr) {
-      console.warn('[semneaza-agent] deal_rooms upsert failed:', dealRoomErr.message)
+      console.error('[semneaza-agent] dealrooms upsert FAILED:', {
+        message: dealRoomErr.message,
+        details: dealRoomErr.details,
+        hint:    dealRoomErr.hint,
+        code:    dealRoomErr.code,
+      })
     } else {
-      console.log(`[semneaza-agent] deal_rooms upserted for contract ${sigReq.contract_id}`)
+      console.log(`[semneaza-agent] dealrooms upsert SUCCESS id=${drData?.id} contract=${sigReq.contract_id}`)
     }
   } catch (e) {
-    console.warn('[semneaza-agent] deal_rooms upsert failed (non-fatal):', e)
+    console.error('[semneaza-agent] dealrooms upsert exception (non-fatal):', e)
   }
 
   // 6. Send completion emails to both parties
