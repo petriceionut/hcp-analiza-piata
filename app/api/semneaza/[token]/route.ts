@@ -41,14 +41,20 @@ function parseUserAgent(ua: string): string {
 }
 
 // ── Sanitize text for jsPDF WinAnsi (Latin-1) encoding ───────────────────────
+// Use explicit Unicode escapes to avoid source-encoding ambiguity.
+// Handles both Romanian Unicode variants (e.g. U+0219 ș and U+015F ş).
 function sanitizeForPdf(text: string): string {
   return text
-    // Romanian characters → ASCII
-    .replace(/[ț]/g, 't').replace(/[Ț]/g, 'T')
-    .replace(/[ș]/g, 's').replace(/[Ș]/g, 'S')
-    .replace(/[ă]/g, 'a').replace(/[Ă]/g, 'A')
-    .replace(/[î]/g, 'i').replace(/[Î]/g, 'I')
-    .replace(/[â]/g, 'a').replace(/[Â]/g, 'A')
+    // ț (U+021B) and ţ (U+0163) → t
+    .replace(/[\u021B\u0163]/g, 't').replace(/[\u021A\u0162]/g, 'T')
+    // ș (U+0219) and ş (U+015F) → s
+    .replace(/[\u0219\u015F]/g, 's').replace(/[\u0218\u015E]/g, 'S')
+    // ă (U+0103) → a
+    .replace(/\u0103/g, 'a').replace(/\u0102/g, 'A')
+    // î (U+00EE) → i
+    .replace(/\u00EE/g, 'i').replace(/\u00CE/g, 'I')
+    // â (U+00E2) → a
+    .replace(/\u00E2/g, 'a').replace(/\u00C2/g, 'A')
     // Typographic quotes and dashes → plain ASCII
     .replace(/[\u201C\u201D\u201E]/g, '"')
     .replace(/[\u2018\u2019\u201A]/g, "'")

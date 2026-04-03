@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { sendEmail } from '@/lib/email'
 
 const AGENT_NAME     = 'Petrice Ioan'
-const AGENT_EMAIL    = 'joan.petrice@homoecapital.ro'
+const AGENT_EMAIL    = 'ionutpetrice1224@gmail.com'
 const APP_URL        = 'https://hcp-analiza-piata.vercel.app'
 const STORAGE_BUCKET = 'contracte-semnate'
 
@@ -39,6 +40,23 @@ function parseUserAgent(ua: string): string {
   return `${browser} / ${os}`
 }
 
+// ── Sanitize text for jsPDF (explicit Unicode escapes, both RO variants) ──────
+function sanitizeForPdf(text: string): string {
+  return text
+    .replace(/[\u021B\u0163]/g, 't').replace(/[\u021A\u0162]/g, 'T')
+    .replace(/[\u0219\u015F]/g, 's').replace(/[\u0218\u015E]/g, 'S')
+    .replace(/\u0103/g, 'a').replace(/\u0102/g, 'A')
+    .replace(/\u00EE/g, 'i').replace(/\u00CE/g, 'I')
+    .replace(/\u00E2/g, 'a').replace(/\u00C2/g, 'A')
+    .replace(/[\u201C\u201D\u201E]/g, '"')
+    .replace(/[\u2018\u2019\u201A]/g, "'")
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/\u2026/g, '...')
+    .replace(/\u00A0/g, ' ')
+    // eslint-disable-next-line no-control-regex
+    .replace(/[^\x00-\xFF]/g, '?')
+}
+
 // ── PDF generation with both signature blocks ─────────────────────────────────
 async function generateFinalPDF(
   contractText: string,
@@ -57,9 +75,10 @@ async function generateFinalPDF(
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(10)
+  doc.setCharSpace(0)
 
   for (const rawLine of contractText.split('\n')) {
-    const wrapped = doc.splitTextToSize(rawLine || ' ', maxW)
+    const wrapped = doc.splitTextToSize(sanitizeForPdf(rawLine) || ' ', maxW)
     for (const line of wrapped) {
       checkPage()
       doc.text(line, margin, y)
@@ -75,11 +94,11 @@ async function generateFinalPDF(
   doc.text('SEMNATURA ELECTRONICA - CLIENT', margin, y); y += 6
   doc.setFont('helvetica', 'normal')
   for (const sl of [
-    `Semnat electronic de: ${client.name}`,
+    `Semnat electronic de: ${sanitizeForPdf(client.name)}`,
     `Email: ${client.email}`,
     ...(client.telefon ? [`Telefon: ${client.telefon}`] : []),
     `Adresa IP: ${client.ip}`,
-    `Dispozitiv: ${client.device}`,
+    `Dispozitiv: ${sanitizeForPdf(client.device)}`,
     `Data si ora: ${client.signedAt}`,
   ]) {
     checkPage(); doc.text(sl, margin, y); y += 5
@@ -93,10 +112,10 @@ async function generateFinalPDF(
   doc.text('SEMNATURA ELECTRONICA - AGENT', margin, y); y += 6
   doc.setFont('helvetica', 'normal')
   for (const sl of [
-    `Semnat electronic de: ${agent.name}`,
+    `Semnat electronic de: ${sanitizeForPdf(agent.name)}`,
     `Email: ${agent.email}`,
     `Adresa IP: ${agent.ip}`,
-    `Dispozitiv: ${agent.device}`,
+    `Dispozitiv: ${sanitizeForPdf(agent.device)}`,
     `Data si ora: ${agent.signedAt}`,
   ]) {
     checkPage(); doc.text(sl, margin, y); y += 5
@@ -124,18 +143,6 @@ async function uploadPDF(
   return data.publicUrl
 }
 
-// ── Send email via Resend ─────────────────────────────────────────────────────
-async function sendEmail(to: string, subject: string, html: string) {
-  const key = process.env.RESEND_API_KEY
-  if (!key) { console.warn('[semneaza-agent] RESEND_API_KEY not set'); return }
-
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: 'onboarding@resend.dev', to, subject, html }),
-  })
-  if (!res.ok) console.error('[semneaza-agent] Resend error:', res.status, await res.text())
-}
 
 function completionEmail(
   toName: string,
@@ -235,15 +242,14 @@ export async function POST(
     console.error('[semneaza-agent] PDF generation failed (non-fatal):', e)
   }
 
-  // 3. Update signature_requests
+  // 3. Update signature_requests — only v1 columns
   const { error: updateErr } = await supabase
     .from('signature_requests')
     .update({
-      status:           'semnat_complet',
-      agent_signed_at:  agentSignedAt.toISOString(),
-      agent_ip:         ip,
-      agent_device_info: device,
-      pdf_url:          pdfUrl,
+      status:    'signed',
+      signed_at: agentSignedAt.toISOString(),
+      signer_ip: ip,
+      device_info: device,
     })
     .eq('id', sigReq.id)
 
