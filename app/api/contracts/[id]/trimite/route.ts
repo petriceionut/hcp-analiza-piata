@@ -1,5 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+
+function getAdminClient() {
+  return createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+}
 
 export async function POST(
   request: Request,
@@ -12,9 +20,18 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { method } = await request.json()
+  // Parse body — method + contractText from StepPreview
+  let body: Record<string, unknown>
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
 
-  // Get contract
+  const method       = typeof body.method       === 'string' ? body.method       : 'email'
+  const contractText = typeof body.contractText === 'string' ? body.contractText : ''
+
+  // Get contract (verify ownership)
   const { data: contract, error: contractError } = await supabase
     .from('contracts')
     .select('*')
@@ -26,17 +43,41 @@ export async function POST(
     return NextResponse.json({ error: 'Contract not found' }, { status: 404 })
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
-  const signingLink = `${appUrl}/semneaza/${contract.client_token}`
+  const clientEmail = contract.client_data?.email ?? ''
+  const clientName  = `${contract.client_data?.prenume ?? ''} ${contract.client_data?.nume ?? ''}`.trim() || 'Client'
 
-  const clientName = `${contract.client_data?.prenume} ${contract.client_data?.nume}`
+  if (!clientEmail) {
+    return NextResponse.json({ error: 'clientEmail missing on contract' }, { status: 400 })
+  }
+
+  // Insert into signature_requests — this generates a UUID token
+  const admin = getAdminClient()
+  const { data: sigReq, error: sigErr } = await admin
+    .from('signature_requests')
+    .insert({
+      contract_id:   params.id,
+      client_email:  clientEmail,
+      client_name:   clientName,
+      contract_text: contractText,
+      status:        'pending',
+    })
+    .select('token')
+    .single()
+
+  if (sigErr || !sigReq) {
+    console.error('[trimite] failed to insert signature_request:', sigErr)
+    return NextResponse.json({ error: 'Failed to create signature request', detail: sigErr?.message }, { status: 500 })
+  }
+
+  const appUrl     = process.env.NEXT_PUBLIC_APP_URL ?? 'https://hcp-analiza-piata.vercel.app'
+  const signingLink = `${appUrl}/semneaza/${sigReq.token}`
 
   let deliveryWarning: string | undefined
 
   if (method === 'email') {
     try {
       await sendEmail({
-        to: contract.client_data.email,
+        to: clientEmail,
         subject: 'Contract pentru semnare — HCP Imobiliare',
         html: buildEmailTemplate(clientName, signingLink, contract.tip_contract),
       })
@@ -57,7 +98,7 @@ export async function POST(
   }
 
   // Update contract status
-  await supabase
+  await admin
     .from('contracts')
     .update({ status: 'trimis_client' })
     .eq('id', params.id)
