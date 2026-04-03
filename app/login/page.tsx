@@ -1,27 +1,52 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
-import { Building2, Eye, EyeOff, Lock, Mail } from 'lucide-react'
+import { Building2, Eye, EyeOff, Lock, Mail, Zap } from 'lucide-react'
+
+const IS_DEV = process.env.NODE_ENV === 'development'
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [email, setEmail]             = useState('')
+  const [password, setPassword]       = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const router = useRouter()
-  const supabase = createClient()
+  const [loading, setLoading]         = useState(false)
+  const [devLoading, setDevLoading]   = useState(false)
+  const router      = useRouter()
+  const searchParams = useSearchParams()
+  const supabase    = createClient()
+
+  // Auto-trigger dev login when ?dev=true (development only)
+  useEffect(() => {
+    if (IS_DEV && searchParams.get('dev') === 'true') {
+      handleDevLogin()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleDevLogin = async () => {
+    if (!IS_DEV) return
+    setDevLoading(true)
+    try {
+      const res = await fetch('/api/dev-login', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast.success(`Dev login: ${data.email}`)
+      router.push('/dashboard')
+      router.refresh()
+    } catch (err) {
+      toast.error(`Dev login failed: ${err instanceof Error ? err.message : 'unknown error'}`)
+      setDevLoading(false)
+    }
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
       toast.error('Email sau parolă incorectă')
@@ -53,6 +78,27 @@ export default function LoginPage() {
           <h1 className="text-3xl font-bold text-white">HCP</h1>
           <p className="text-blue-300 mt-1 text-sm">Platforma Imobiliara Profesionala</p>
         </div>
+
+        {/* Dev bypass banner */}
+        {IS_DEV && (
+          <div className="mb-4 bg-amber-500/20 border border-amber-400/40 rounded-xl p-4 text-center">
+            <p className="text-amber-300 text-xs font-medium mb-2">
+              DEV MODE — bypass autentificare
+            </p>
+            <button
+              type="button"
+              onClick={handleDevLogin}
+              disabled={devLoading}
+              className="flex items-center justify-center gap-2 w-full bg-amber-500 hover:bg-amber-400 disabled:bg-amber-700 text-white font-semibold py-2.5 rounded-lg transition-all text-sm"
+            >
+              <Zap className="w-4 h-4" />
+              {devLoading ? 'Se autentifica...' : 'Dev Login (skip parolă)'}
+            </button>
+            <p className="text-amber-400/60 text-xs mt-2">
+              Necesită DEV_TEST_EMAIL + DEV_TEST_PASSWORD în .env.local
+            </p>
+          </div>
+        )}
 
         {/* Card */}
         <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-8 border border-white/20 shadow-2xl">
