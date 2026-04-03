@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendEmail } from '@/lib/email'
 
-const AGENT_EMAIL      = 'joan.petrice@homoecapital.ro'
+const AGENT_EMAIL      = 'ionutpetrice1224@gmail.com'
 const AGENT_NAME       = 'Petrice Ioan'
 const APP_URL          = 'https://hcp-analiza-piata.vercel.app'
 const STORAGE_BUCKET   = 'contracte-semnate'
@@ -40,6 +40,16 @@ function parseUserAgent(ua: string): string {
   return `${browser} / ${os}`
 }
 
+// ── Transliterate Romanian characters to ASCII for Helvetica compatibility ────
+function ro(text: string): string {
+  return text
+    .replace(/[ț]/g, 't').replace(/[Ț]/g, 'T')
+    .replace(/[ș]/g, 's').replace(/[Ș]/g, 'S')
+    .replace(/[ă]/g, 'a').replace(/[Ă]/g, 'A')
+    .replace(/[î]/g, 'i').replace(/[Î]/g, 'I')
+    .replace(/[â]/g, 'a').replace(/[Â]/g, 'A')
+}
+
 // ── PDF generation using jsPDF (pure JS, no filesystem) ──────────────────────
 async function generatePDF(
   contractText: string,
@@ -63,7 +73,7 @@ async function generatePDF(
   doc.setFontSize(10)
 
   for (const rawLine of contractText.split('\n')) {
-    const wrapped = doc.splitTextToSize(rawLine || ' ', maxW)
+    const wrapped = doc.splitTextToSize(ro(rawLine) || ' ', maxW)
     for (const line of wrapped) {
       checkPage()
       doc.text(line, margin, y)
@@ -83,11 +93,11 @@ async function generatePDF(
 
   doc.setFont('helvetica', 'normal')
   const sigLines = [
-    `Semnat electronic de: ${client.name}`,
+    `Semnat electronic de: ${ro(client.name)}`,
     `Email: ${client.email}`,
     ...(client.telefon ? [`Telefon: ${client.telefon}`] : []),
     `Adresa IP: ${client.ip}`,
-    `Dispozitiv: ${client.device}`,
+    `Dispozitiv: ${ro(client.device)}`,
     `Data si ora: ${client.signedAt}`,
   ]
   for (const sl of sigLines) {
@@ -191,12 +201,12 @@ export async function POST(
     return NextResponse.json({ error: 'Eroare la salvarea semnăturii' }, { status: 500 })
   }
 
-  // 6. Update contracts status (best-effort)
-  await supabase
+  // 6. Update contracts status
+  const { error: contractErr } = await supabase
     .from('contracts')
     .update({ status: 'semnat_client' })
     .eq('id', sigReq.contract_id)
-    .then(({ error }) => { if (error) console.warn('[semneaza] contracts update failed:', error) })
+  if (contractErr) console.error('[semneaza] contracts status update failed:', contractErr)
 
   // 7. Email agent with agent signing link
   const agentSigningLink = `${APP_URL}/semneaza-agent/${token}`

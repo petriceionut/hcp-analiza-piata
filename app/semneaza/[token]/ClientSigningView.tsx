@@ -87,7 +87,7 @@ export default function ClientSigningView({
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4">
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="space-y-6">
 
         {/* Header */}
         <div className="text-center">
@@ -106,7 +106,7 @@ export default function ClientSigningView({
           </div>
           <div
             style={{
-              padding: '40px 60px',
+              padding: '32px 16px',
               fontSize: '16px',
               lineHeight: '1.7',
               fontFamily: 'Arial, Helvetica, sans-serif',
