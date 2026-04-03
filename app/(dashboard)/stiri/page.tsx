@@ -1,4 +1,4 @@
-import { fetchNews, NEWS_FALLBACK_IMAGE } from '@/lib/news'
+import { fetchNews, NEWS_FALLBACK_IMAGE, type NewsArticle } from '@/lib/news'
 import { Newspaper } from 'lucide-react'
 
 function relDate(pubDate: string): string {
@@ -14,7 +14,7 @@ function relDate(pubDate: string): string {
 }
 
 export default async function StiriPage() {
-  let articles = []
+  let articles: NewsArticle[] = []
   try {
     articles = await fetchNews(15)
   } catch {
