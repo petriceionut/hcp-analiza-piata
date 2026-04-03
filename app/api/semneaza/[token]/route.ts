@@ -45,7 +45,7 @@ function parseUserAgent(ua: string): string {
 //    composed codepoints (U+0219 ș) that the regexes can match.
 // 2. Explicit Unicode escapes for both Romanian variants of ș/ț.
 // 3. Final strip of anything outside Latin-1 that slipped through.
-function sanitizeForPdfWithDiag(text: string): string {
+function sanitizeForPdf(text: string): string {
   const nfc = text.normalize('NFC')
   const out = nfc
     // ț (U+021B) and ţ (U+0163) → t
@@ -72,7 +72,7 @@ function sanitizeForPdfWithDiag(text: string): string {
 
 let _pdfSanitizeDiagDone = false
 function sanitizeForPdfWithDiag(text: string): string {
-  const result = sanitizeForPdfWithDiag(text)
+  const result = sanitizeForPdf(text)
   if (!_pdfSanitizeDiagDone && text !== result) {
     _pdfSanitizeDiagDone = true
     const before = [...text].filter(c => c.codePointAt(0)! > 127).slice(0, 8).map(c => `${c}(U+${c.codePointAt(0)!.toString(16).toUpperCase()})`)
