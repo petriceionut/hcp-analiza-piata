@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { extractDateOfBirthFromCNP } from '@/lib/utils'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -72,6 +73,7 @@ Daca nu poti citi un camp, pune null. Returneaza DOAR JSON-ul, fara alte explica
     }
 
     const extracted = JSON.parse(jsonMatch[0])
+    extracted.data_nastere = extractDateOfBirthFromCNP(extracted.cnp ?? '') ?? null
     return NextResponse.json(extracted)
   } catch (error) {
     console.error('OCR error:', error)

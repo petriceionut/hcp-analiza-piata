@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { extractDateOfBirthFromCNP } from '@/lib/utils'
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,6 +30,7 @@ export async function POST(req: NextRequest) {
         clarificari: body.clarificari ?? null,
         cheltuieli_lunare: body.cheltuieliLunare ?? null,
         derogari: body.derogari ?? null,
+        data_nastere: extractDateOfBirthFromCNP(body.clientData?.cnp ?? '') ?? null,
         status: 'draft',
       })
       .select('id')

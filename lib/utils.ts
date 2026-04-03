@@ -92,3 +92,36 @@ export function getInitials(name: string): string {
     .toUpperCase()
     .slice(0, 2)
 }
+
+/**
+ * Extracts date of birth from a Romanian CNP (13-digit personal ID).
+ * Digit 1: 1/2 = 1900s, 3/4 = 1800s, 5/6 = 2000s (male/female pairs).
+ * Digits 2-3: year, 4-5: month, 6-7: day.
+ * Returns ISO date string YYYY-MM-DD or null if invalid.
+ */
+export function extractDateOfBirthFromCNP(cnp: string): string | null {
+  if (!cnp || cnp.length !== 13 || !/^\d{13}$/.test(cnp)) return null
+
+  const s = parseInt(cnp[0], 10)
+  const yy = cnp.substring(1, 3)
+  const mm = cnp.substring(3, 5)
+  const dd = cnp.substring(5, 7)
+
+  let century: string
+  if (s === 1 || s === 2) century = '19'
+  else if (s === 3 || s === 4) century = '18'
+  else if (s === 5 || s === 6) century = '20'
+  else return null // 7/8 = residents/foreigners, 9 = other — no reliable birth year
+
+  const isoDate = `${century}${yy}-${mm}-${dd}`
+  const d = new Date(isoDate)
+  if (isNaN(d.getTime())) return null
+  // Verify date parts didn't overflow (e.g. Feb 30)
+  if (
+    d.getFullYear() !== parseInt(`${century}${yy}`, 10) ||
+    d.getMonth() + 1 !== parseInt(mm, 10) ||
+    d.getDate() !== parseInt(dd, 10)
+  ) return null
+
+  return isoDate
+}

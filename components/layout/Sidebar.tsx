@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 import {
   Building2,
+  CalendarDays,
   FileText,
   Home,
   LayoutDashboard,
@@ -38,6 +39,11 @@ const navItems = [
     href: '/dealroom',
     icon: Home,
     label: 'DealRoom',
+  },
+  {
+    href: '/calendar',
+    icon: CalendarDays,
+    label: 'Calendar',
   },
   {
     href: '/acp',
