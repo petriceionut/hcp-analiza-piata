@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { UserPlus, MoreVertical, Pencil, Trash2 } from 'lucide-react'
+import { UserPlus, MoreVertical, Pencil, Trash2, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { DEALROOM_STATUS_LABELS, formatDate } from '@/lib/utils'
 import { DealRoom } from '@/types'
@@ -18,13 +18,26 @@ function capitalize(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
+const EMPTY_FORM = { nume: '', prenume: '', telefon: '', email: '', data_vizionare: '', ora_vizionare: '' }
+
 export default function DealRoomCard({ dr }: { dr: DealRoom }) {
   const router = useRouter()
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [toast, setToast] = useState(false)
+
+  // 3-dot menu
+  const [menuOpen, setMenuOpen]       = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  // Delete flow
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting]           = useState(false)
+
+  // Add-client modal
+  const [clientModal, setClientModal] = useState(false)
+  const [form, setForm]               = useState(EMPTY_FORM)
+  const [saving, setSaving]           = useState(false)
+
+  // Toasts
+  const [toast, setToast]             = useState<string | null>(null)
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -38,9 +51,37 @@ export default function DealRoomCard({ dr }: { dr: DealRoom }) {
 
   useEffect(() => {
     if (!toast) return
-    const t = setTimeout(() => setToast(false), 2500)
+    const t = setTimeout(() => setToast(null), 2500)
     return () => clearTimeout(t)
   }, [toast])
+
+  function openClientModal() {
+    setForm(EMPTY_FORM)
+    setClientModal(true)
+  }
+
+  async function handleSaveClient(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    const supabase = createClient()
+    const { error } = await supabase.from('dealroom_clients').insert({
+      dealroom_id:    dr.id,
+      nume:           form.nume,
+      prenume:        form.prenume,
+      telefon:        form.telefon,
+      email:          form.email,
+      data_vizionare: form.data_vizionare || null,
+      ora_vizionare:  form.ora_vizionare  || null,
+    })
+    setSaving(false)
+    if (error) {
+      setToast('Eroare la salvare. Încearcă din nou.')
+    } else {
+      setClientModal(false)
+      setToast('Client adăugat cu succes!')
+      router.refresh()
+    }
+  }
 
   async function handleDelete() {
     setDeleting(true)
@@ -55,10 +96,13 @@ export default function DealRoomCard({ dr }: { dr: DealRoom }) {
     .filter(Boolean)
     .join(' - ')
 
+  const inputCls = 'w-full px-3 py-2 rounded-lg border border-gray-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+  const labelCls = 'block text-xs font-medium text-slate-600 mb-1'
+
   return (
     <>
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
-        {/* Card body — navigable */}
+        {/* Card body */}
         <div className="flex items-start p-6 gap-2 flex-1">
           <Link href={`/dealroom/${dr.id}`} className="flex-1 min-w-0 hover:opacity-80 transition-opacity">
             <div className="flex items-start gap-2 mb-1">
@@ -87,7 +131,7 @@ export default function DealRoomCard({ dr }: { dr: DealRoom }) {
               <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50">
                 <button
                   type="button"
-                  onClick={() => { setMenuOpen(false); setToast(true) }}
+                  onClick={() => { setMenuOpen(false); setToast('În curând') }}
                   className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                 >
                   <Pencil className="w-4 h-4 text-slate-400" />
@@ -110,6 +154,7 @@ export default function DealRoomCard({ dr }: { dr: DealRoom }) {
         <div className="px-6 pb-5">
           <button
             type="button"
+            onClick={openClientModal}
             className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-emerald-200 text-emerald-700 text-sm font-medium hover:bg-emerald-50 transition-colors"
           >
             <UserPlus className="w-4 h-4" />
@@ -118,7 +163,116 @@ export default function DealRoomCard({ dr }: { dr: DealRoom }) {
         </div>
       </div>
 
-      {/* Confirm delete dialog */}
+      {/* ── Add-client modal ───────────────────────────────────────────── */}
+      {clientModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
+              <h3 className="text-lg font-semibold text-slate-900">Adaugă client</h3>
+              <button
+                type="button"
+                onClick={() => setClientModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSaveClient} className="px-6 py-5 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>Nume</label>
+                  <input
+                    type="text"
+                    required
+                    value={form.nume}
+                    onChange={e => setForm(f => ({ ...f, nume: e.target.value }))}
+                    className={inputCls}
+                    placeholder="Popescu"
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Prenume</label>
+                  <input
+                    type="text"
+                    required
+                    value={form.prenume}
+                    onChange={e => setForm(f => ({ ...f, prenume: e.target.value }))}
+                    className={inputCls}
+                    placeholder="Ion"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className={labelCls}>Telefon</label>
+                <input
+                  type="tel"
+                  required
+                  value={form.telefon}
+                  onChange={e => setForm(f => ({ ...f, telefon: e.target.value }))}
+                  className={inputCls}
+                  placeholder="07xx xxx xxx"
+                />
+              </div>
+
+              <div>
+                <label className={labelCls}>Email</label>
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                  className={inputCls}
+                  placeholder="client@email.com"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>Data vizionării</label>
+                  <input
+                    type="date"
+                    value={form.data_vizionare}
+                    onChange={e => setForm(f => ({ ...f, data_vizionare: e.target.value }))}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Ora vizionării</label>
+                  <input
+                    type="time"
+                    value={form.ora_vizionare}
+                    onChange={e => setForm(f => ({ ...f, ora_vizionare: e.target.value }))}
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setClientModal(false)}
+                  disabled={saving}
+                  className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  Anulează
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors disabled:opacity-60"
+                >
+                  {saving ? 'Se salvează…' : 'Salvează'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Confirm delete dialog ──────────────────────────────────────── */}
       {confirmDelete && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full">
@@ -148,10 +302,10 @@ export default function DealRoomCard({ dr }: { dr: DealRoom }) {
         </div>
       )}
 
-      {/* "În curând" toast */}
+      {/* ── Toast ─────────────────────────────────────────────────────── */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-sm px-5 py-2.5 rounded-full shadow-lg z-50">
-          În curând
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-sm px-5 py-2.5 rounded-full shadow-lg z-50 whitespace-nowrap">
+          {toast}
         </div>
       )}
     </>
