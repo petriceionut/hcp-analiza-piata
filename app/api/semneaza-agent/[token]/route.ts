@@ -270,23 +270,31 @@ export async function POST(
     .eq('id', sigReq.contract_id)
     .then(({ error }) => { if (error) console.warn('[semneaza-agent] contracts update failed:', error) })
 
-  // 5. Upsert DealRoom entry (best-effort)
+  // 5. Upsert deal_rooms entry (best-effort)
   try {
-    if (contract?.agent_id) {
-      await supabase.from('dealrooms').upsert(
-        {
-          contract_id:     sigReq.contract_id,
-          agent_id:        contract.agent_id,
-          tip_proprietate: contract.property_data?.tip_proprietate ?? 'apartament',
-          adresa_scurta:   contract.property_data?.adresa ?? '',
-          status:          'activ',
-        },
-        { onConflict: 'contract_id' },
-      )
-      console.log(`[semneaza-agent] DealRoom upserted for contract ${sigReq.contract_id}`)
+    const propertyAddress: string =
+      contract?.property_data?.adresa_imobil ??
+      contract?.property_data?.property_address ??
+      contract?.property_data?.adresa ??
+      ''
+    const clientName: string = sigReq.client_name ?? ''
+
+    const { error: dealRoomErr } = await supabase.from('deal_rooms').upsert(
+      {
+        contract_id:      sigReq.contract_id,
+        property_address: propertyAddress,
+        client_name:      clientName,
+        status:           'activ',
+      },
+      { onConflict: 'contract_id' },
+    )
+    if (dealRoomErr) {
+      console.warn('[semneaza-agent] deal_rooms upsert failed:', dealRoomErr.message)
+    } else {
+      console.log(`[semneaza-agent] deal_rooms upserted for contract ${sigReq.contract_id}`)
     }
   } catch (e) {
-    console.warn('[semneaza-agent] DealRoom upsert failed (non-fatal):', e)
+    console.warn('[semneaza-agent] deal_rooms upsert failed (non-fatal):', e)
   }
 
   // 6. Send completion emails to both parties
