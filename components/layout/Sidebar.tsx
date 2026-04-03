@@ -12,6 +12,7 @@ import {
   Home,
   LayoutDashboard,
   LogOut,
+  ScanLine,
   TrendingUp,
   ChevronLeft,
   ChevronRight,
@@ -44,6 +45,11 @@ const navItems = [
     href: '/calendar',
     icon: CalendarDays,
     label: 'Calendar',
+  },
+  {
+    href: '/scanner',
+    icon: ScanLine,
+    label: 'Scanner',
   },
   {
     href: '/acp',

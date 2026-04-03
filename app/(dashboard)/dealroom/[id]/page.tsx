@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
-import { DealRoom, Buyer, Offer, DealRoomDocument, DealRoomClient } from '@/types'
+import { DealRoom, Buyer, Offer, DealRoomDocument, DealRoomClient, DocumentScanat } from '@/types'
 import { PROPERTY_ICONS, PROPERTY_TYPES, DEALROOM_STATUS_LABELS } from '@/lib/utils'
 import DealRoomAgentDashboard from '@/components/dealroom/DealRoomAgentDashboard'
 
@@ -20,6 +20,7 @@ export default async function DealRoomDetailPage({
     { data: cumparatori },
     { data: oferte },
     { data: clienti },
+    { data: documenteScanate },
   ] = await Promise.all([
     supabase
       .from('dealrooms')
@@ -44,6 +45,11 @@ export default async function DealRoomDetailPage({
       .order('created_at', { ascending: false }),
     supabase
       .from('dealroom_clients')
+      .select('*')
+      .eq('dealroom_id', params.id)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('documente_scanate')
       .select('*')
       .eq('dealroom_id', params.id)
       .order('created_at', { ascending: false }),
@@ -92,6 +98,7 @@ export default async function DealRoomDetailPage({
         cumparatori={(cumparatori ?? []) as Buyer[]}
         oferte={(oferte ?? []) as (Offer & { buyer: { nume: string; prenume: string } })[]}
         clienti={(clienti ?? []) as DealRoomClient[]}
+        documenteScanate={(documenteScanate ?? []) as DocumentScanat[]}
       />
     </div>
   )

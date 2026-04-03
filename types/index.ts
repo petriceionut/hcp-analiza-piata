@@ -120,6 +120,16 @@ export interface DealRoomClient {
   created_at: string
 }
 
+export interface DocumentScanat {
+  id: string
+  dealroom_id: string
+  agent_id: string
+  file_url: string
+  file_name: string
+  nr_pagini: number
+  created_at: string
+}
+
 export interface Offer {
   id: string
   dealroom_id: string

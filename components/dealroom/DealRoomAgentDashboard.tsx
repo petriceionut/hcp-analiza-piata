@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { DealRoom, DealRoomDocument, Buyer, Offer, DealRoomClient } from '@/types'
+import { DealRoom, DealRoomDocument, Buyer, Offer, DealRoomClient, DocumentScanat } from '@/types'
 import { formatDate, formatCurrency, formatDateTime } from '@/lib/utils'
 import {
   Upload,
@@ -15,6 +15,8 @@ import {
   ExternalLink,
   Copy,
   X,
+  Download,
+  ScanLine,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -24,6 +26,7 @@ interface Props {
   cumparatori: Buyer[]
   oferte: (Offer & { buyer: { nume: string; prenume: string } })[]
   clienti: DealRoomClient[]
+  documenteScanate: DocumentScanat[]
 }
 
 type Tab = 'documente' | 'cumparatori' | 'oferte'
@@ -34,6 +37,7 @@ export default function DealRoomAgentDashboard({
   cumparatori: initialBuyers,
   oferte: initialOffers,
   clienti,
+  documenteScanate,
 }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('documente')
   const [docs, setDocs] = useState(initialDocs)
@@ -126,7 +130,7 @@ export default function DealRoomAgentDashboard({
   }
 
   const tabs: { id: Tab; label: string; count: number; icon: React.ElementType }[] = [
-    { id: 'documente', label: 'Documente', count: docs.length, icon: FileText },
+    { id: 'documente', label: 'Documente', count: docs.length + documenteScanate.length, icon: FileText },
     { id: 'cumparatori', label: 'Cumparatori', count: buyers.length + clienti.length, icon: Users },
     { id: 'oferte', label: 'Oferte', count: offers.length, icon: Euro },
   ]
@@ -181,7 +185,7 @@ export default function DealRoomAgentDashboard({
             </label>
           </div>
 
-          {docs.length === 0 ? (
+          {docs.length === 0 && documenteScanate.length === 0 ? (
             <div className="bg-white rounded-xl border border-gray-100 p-10 text-center">
               <FileText className="w-8 h-8 text-gray-300 mx-auto mb-3" />
               <p className="text-sm text-gray-500">Niciun document incarcat</p>
@@ -206,6 +210,30 @@ export default function DealRoomAgentDashboard({
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
                     Deschide
+                  </a>
+                </div>
+              ))}
+
+              {documenteScanate.map((doc) => (
+                <div key={doc.id} className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-4">
+                  <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <ScanLine className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-900 truncate">{doc.file_name}</p>
+                    <p className="text-xs text-slate-400">
+                      {doc.nr_pagini} {doc.nr_pagini === 1 ? 'pagină' : 'pagini'} · {formatDate(doc.created_at)}
+                    </p>
+                  </div>
+                  <a
+                    href={doc.file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    download={`${doc.file_name}.pdf`}
+                    className="flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-800 transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Descarcă
                   </a>
                 </div>
               ))}
