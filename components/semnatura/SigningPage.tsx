@@ -2,10 +2,10 @@
 
 import { useRef, useState } from 'react'
 import SignatureCanvas from 'react-signature-canvas'
-import { Contract, ContractType } from '@/types'
-import { createClient } from '@/lib/supabase/client'
-import { CONTRACT_TYPES, PROPERTY_TYPES, formatDate } from '@/lib/utils'
-import { CheckCircle, RotateCcw, PenLine, Loader2, FileText, User, Home } from 'lucide-react'
+import { Contract } from '@/types'
+import ContractPreviewContent from '../contracte/ContractPreviewContent'
+import { WizardData } from '../contracte/ContractWizard'
+import { CheckCircle, RotateCcw, PenLine, Loader2, Building2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface Props {
@@ -15,234 +15,199 @@ interface Props {
 }
 
 export default function SigningPage({ contract, token, signerType }: Props) {
-  const sigCanvasRef = useRef<SignatureCanvas>(null)
-  const [loading, setLoading] = useState(false)
   const [signed, setSigned] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [agreed, setAgreed] = useState(false)
+  const sigCanvasRef = useRef<SignatureCanvas>(null)
 
-  const displayName =
-    signerType === 'client'
-      ? `${contract.client_data?.prenume} ${contract.client_data?.nume}`
-      : 'Agent Imobiliar'
+  const wizardData: WizardData = {
+    tipContract: contract.tip_contract,
+    clientData: contract.client_data,
+    propertyData: contract.property_data,
+    derogari: contract.derogari,
+  }
 
-  const clearSignature = () => {
+  const handleClear = () => {
     sigCanvasRef.current?.clear()
   }
 
   const handleSign = async () => {
+    if (!sigCanvasRef.current || sigCanvasRef.current.isEmpty()) {
+      toast.error('Va rugam sa semnati in campul de mai sus')
+      return
+    }
+
     if (!agreed) {
-      toast.error('Trebuie să fii de acord cu termenii contractului.')
-      return
-    }
-    if (sigCanvasRef.current?.isEmpty()) {
-      toast.error('Te rugăm să semnezi în câmpul de mai jos.')
+      toast.error('Trebuie sa acceptati termenii pentru a semna')
       return
     }
 
-    const signatureDataUrl = sigCanvasRef.current?.toDataURL('image/png')
-    if (!signatureDataUrl) {
-      toast.error('Semnătura nu a putut fi capturată.')
-      return
-    }
+    const signatureDataUrl = sigCanvasRef.current.toDataURL('image/png')
+    setSubmitting(true)
 
-    setLoading(true)
     try {
-      const supabase = createClient()
-      const now = new Date().toISOString()
-      const updates: Record<string, string> = {}
+      const res = await fetch('/api/signatures', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          signerType,
+          signature: signatureDataUrl,
+        }),
+      })
 
-      if (signerType === 'client') {
-        updates.client_semnatura = signatureDataUrl
-        updates.client_semnat_la = now
-        updates.status = 'semnat_client'
-      } else {
-        updates.agent_semnatura = signatureDataUrl
-        updates.agent_semnat_la = now
-        updates.status = contract.client_semnat_la ? 'semnat_ambele' : contract.status
-      }
-
-      const { error } = await supabase
-        .from('contracts')
-        .update(updates)
-        .eq('id', contract.id)
-
-      if (error) throw error
+      if (!res.ok) throw new Error()
 
       setSigned(true)
       toast.success('Contract semnat cu succes!')
-    } catch (err) {
-      console.error(err)
-      toast.error('A apărut o eroare. Te rugăm să încerci din nou.')
+    } catch {
+      toast.error('Eroare la semnare. Va rugam incercati din nou.')
     } finally {
-      setLoading(false)
+      setSubmitting(false)
     }
   }
 
   if (signed) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 max-w-md w-full text-center fade-in">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-green-950 to-slate-900 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md text-center fade-in">
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-10 h-10 text-green-600" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">Contract semnat!</h1>
-          <p className="text-slate-500 mb-6">
-            Semnătura a fost înregistrată cu succes.{' '}
+          <h1 className="text-2xl font-bold text-slate-900 mb-3">
+            Contract semnat!
+          </h1>
+          <p className="text-slate-600 mb-2">
             {signerType === 'client'
-              ? 'Agentul va fi notificat și va semna la rândul lui.'
-              : 'Contractul este acum complet semnat de ambele părți.'}
+              ? 'Va multumim! Agentul va fi notificat pentru a semna si el contractul.'
+              : 'Contractul a fost semnat de ambele parti si este acum finalizat!'}
           </p>
-          <div className="bg-slate-50 rounded-xl p-4 text-left text-sm text-slate-600 space-y-2">
-            <div className="flex justify-between">
-              <span className="text-slate-400">Data semnării</span>
-              <span className="font-medium">{formatDate(new Date().toISOString())}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">Semnat de</span>
-              <span className="font-medium">{displayName}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">Tip contract</span>
-              <span className="font-medium text-right">
-                {CONTRACT_TYPES[contract.tip_contract as ContractType]}
-              </span>
-            </div>
-          </div>
+          {signerType === 'client' && (
+            <p className="text-sm text-slate-400">
+              Veti primi o copie a contractului semnat pe email dupa ce agentul semneaza.
+            </p>
+          )}
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 py-8 px-4">
-      <div className="max-w-2xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="text-center">
-          <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4">
-            <PenLine className="w-6 h-6 text-white" />
+    <div className="min-h-screen bg-slate-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-100 px-6 py-4">
+        <div className="max-w-3xl mx-auto flex items-center gap-3">
+          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+            <Building2 className="w-4 h-4 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">Semnare Contract</h1>
-          <p className="text-slate-500 mt-1">
-            {CONTRACT_TYPES[contract.tip_contract as ContractType]}
-          </p>
+          <div>
+            <h1 className="font-bold text-slate-900 text-sm">HCP Imobiliare</h1>
+            <p className="text-xs text-slate-500">Semnatura digitala securizata</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-3xl mx-auto p-6">
+        {/* Info banner */}
+        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6 flex items-start gap-3">
+          <PenLine className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-blue-800">
+              {signerType === 'client'
+                ? `Buna ziua, ${contract.client_data?.prenume} ${contract.client_data?.nume}!`
+                : 'Semnatura agent'}
+            </p>
+            <p className="text-sm text-blue-600 mt-1">
+              {signerType === 'client'
+                ? 'Va rugam cititi cu atentie contractul de mai jos, apoi semnati in campul dedicat.'
+                : `Clientul ${contract.client_data?.prenume} ${contract.client_data?.nume} a semnat contractul. Va rugam semnati si dvs. pentru a finaliza.`}
+            </p>
+          </div>
         </div>
 
-        {/* Contract Summary */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
-          <h2 className="font-semibold text-slate-900 flex items-center gap-2">
-            <FileText className="w-4 h-4 text-blue-600" />
-            Detalii contract
-          </h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-            <div className="bg-slate-50 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <User className="w-4 h-4 text-slate-400" />
-                <span className="text-slate-500 text-xs uppercase tracking-wide font-medium">
-                  Client
-                </span>
-              </div>
-              <p className="font-semibold text-slate-900">
-                {contract.client_data?.prenume} {contract.client_data?.nume}
-              </p>
-              <p className="text-slate-500 text-xs mt-0.5">{contract.client_data?.telefon}</p>
-            </div>
-
-            <div className="bg-slate-50 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Home className="w-4 h-4 text-slate-400" />
-                <span className="text-slate-500 text-xs uppercase tracking-wide font-medium">
-                  Proprietate
-                </span>
-              </div>
-              <p className="font-semibold text-slate-900">
-                {PROPERTY_TYPES[contract.property_data?.tip_proprietate]}
-              </p>
-              <p className="text-slate-500 text-xs mt-0.5 line-clamp-2">
-                {contract.property_data?.adresa}
-              </p>
-            </div>
+        {/* Contract preview */}
+        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden mb-6">
+          <div className="bg-gray-50 border-b border-gray-200 px-5 py-3">
+            <h3 className="text-sm font-semibold text-slate-700">Contract pentru semnare</h3>
           </div>
-
-          {contract.derogari && (
-            <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 text-sm">
-              <p className="text-amber-700 font-medium mb-1">Derogări / Clauze speciale</p>
-              <p className="text-amber-600">{contract.derogari}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Signature Area */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold text-slate-900">Semnătura dvs.</h2>
-            <button
-              type="button"
-              onClick={clearSignature}
-              className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 transition-colors"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              Șterge
-            </button>
-          </div>
-
-          <p className="text-sm text-slate-500 mb-4">
-            Semnați în câmpul de mai jos folosind mouse-ul sau degetul.
-          </p>
-
-          <div className="border-2 border-dashed border-gray-200 rounded-xl overflow-hidden bg-gray-50 hover:border-blue-300 transition-colors">
-            <SignatureCanvas
-              ref={sigCanvasRef}
-              canvasProps={{
-                className: 'w-full',
-                style: { width: '100%', height: '180px', display: 'block' },
-              }}
-              backgroundColor="rgb(249, 250, 251)"
-              penColor="#1e293b"
+          <div className="p-6 max-h-96 overflow-y-auto">
+            <ContractPreviewContent
+              data={wizardData}
+              showSignatures={signerType === 'agent'}
+              clientSignature={contract.client_semnatura}
             />
           </div>
-
-          <p className="text-xs text-slate-400 mt-2 text-center">
-            Semnătura electronică a lui{' '}
-            <span className="font-medium text-slate-600">{displayName}</span>
-          </p>
         </div>
 
-        {/* Agreement & Sign */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
+        {/* Signature area */}
+        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden mb-6">
+          <div className="bg-gray-50 border-b border-gray-200 px-5 py-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-700">
+              Semnatura {signerType === 'client' ? 'dumneavoastra' : 'agentului'}
+            </h3>
+            <button
+              onClick={handleClear}
+              className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 transition-colors"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Sterge
+            </button>
+          </div>
+          <div className="p-4">
+            <p className="text-xs text-slate-400 mb-3 text-center">
+              Semnati in spatiul de mai jos folosind mouse-ul sau degetul (pe mobil)
+            </p>
+            <div className="border-2 border-dashed border-gray-200 rounded-xl overflow-hidden bg-gray-50">
+              <SignatureCanvas
+                ref={sigCanvasRef}
+                canvasProps={{
+                  className: 'w-full',
+                  style: { height: '180px', display: 'block' },
+                }}
+                backgroundColor="rgb(249, 250, 251)"
+                penColor="#1e293b"
+              />
+            </div>
+            <p className="text-xs text-slate-400 mt-2 text-center">
+              Semnatura va fi inregistrata cu marca temporala {new Date().toLocaleString('ro-RO')}
+            </p>
+          </div>
+        </div>
+
+        {/* Agreement checkbox */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6">
           <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
               checked={agreed}
               onChange={(e) => setAgreed(e.target.checked)}
-              className="mt-0.5 w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+              className="mt-0.5 w-4 h-4 text-blue-600 rounded border-gray-300"
             />
             <span className="text-sm text-slate-600">
-              Am citit și înțeles termenii contractului{' '}
-              <strong>{CONTRACT_TYPES[contract.tip_contract as ContractType]}</strong> și sunt de
-              acord cu toate clauzele stipulate. Confirm că semnătura electronică de mai sus
-              reprezintă consimțământul meu legal.
+              Confirm ca am citit, am inteles si sunt de acord cu toate clauzele prezentului contract.
+              Semnatura digitala aplicata are aceeasi valoare juridica cu semnatura olografa.
             </span>
           </label>
-
-          <button
-            onClick={handleSign}
-            disabled={loading || !agreed}
-            className="w-full flex items-center justify-center gap-2 py-3.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Se salvează semnătura...
-              </>
-            ) : (
-              <>
-                <PenLine className="w-5 h-5" />
-                Semnează contractul
-              </>
-            )}
-          </button>
         </div>
+
+        {/* Sign button */}
+        <button
+          onClick={handleSign}
+          disabled={submitting || !agreed}
+          className="w-full flex items-center justify-center gap-2 py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-xl text-base font-semibold transition-all"
+        >
+          {submitting ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Se semneaza...
+            </>
+          ) : (
+            <>
+              <PenLine className="w-5 h-5" />
+              Semneaza contractul
+            </>
+          )}
+        </button>
       </div>
     </div>
   )

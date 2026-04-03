@@ -1,402 +1,216 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { Camera, Upload, Loader2, X, ScanLine, FileText, CheckCircle, AlertCircle } from 'lucide-react'
+import { useState } from 'react'
+import { ACPRequest, ACPResult, PropertyType } from '@/types'
+import { PROPERTY_TYPES } from '@/lib/utils'
+import {
+  TrendingUp,
+  Loader2,
+  Download,
+  BarChart3,
+  Layers,
+  MessageSquare,
+  Sparkles,
+} from 'lucide-react'
 import toast from 'react-hot-toast'
+import ACPReport from './ACPReport'
 
-interface ExtractedIDData {
-  nume?: string
-  prenume?: string
-  serie_buletin?: string
-  nr_buletin?: string
-  cnp?: string
-  adresa_domiciliu?: string
-}
-
-interface ExtractedCFData {
-  nr_carte_funciara?: string
-  nr_cadastral?: string
-  adresa_proprietate?: string
-  suprafata?: string
-}
-
-function parseIDText(text: string): ExtractedIDData {
-  const result: ExtractedIDData = {}
-
-  // CNP: 13-digit number starting with 1, 2, 5 or 6
-  const cnpMatch = text.match(/\b([1256]\d{12})\b/)
-  if (cnpMatch) result.cnp = cnpMatch[1]
-
-  // Series: "Seria/Série/Series IF Nr./No. 123456" — all on one line
-  const serieMatch =
-    text.match(/(?:Seria|S[eé]rie|Series)[^\n]*?\b([A-Z]{2})\b[^\n]*?\b(\d{6})\b/i) ||
-    text.match(/\b([A-Z]{2})\s+(\d{6})\b/)
-  if (serieMatch) {
-    result.serie_buletin = serieMatch[1]
-    result.nr_buletin = serieMatch[2]
-  }
-
-  // Surname: [ \t] instead of \s — stops capture at newline, not next label line
-  const numeMatch = text.match(/(?:Nume|Nom|Surname)[^\n]*\n[ \t]*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ \t-]{0,29})/im)
-  if (numeMatch) result.nume = numeMatch[1].trim()
-
-  // Given name: same — [ \t] prevents bleeding into Cetățenie or next label
-  const prenumeMatch = text.match(/(?:Prenume|Pr[eé]nom|Given\s+names?)[^\n]*\n[ \t]*([A-ZĂÎȘȚÂ][A-ZĂÎȘȚÂ \t-]{0,39})/im)
-  if (prenumeMatch) result.prenume = prenumeMatch[1].trim()
-
-  // Address: anchor only to "Domiciliu" — not "Adresa/Address" which appears on
-  // other label lines (e.g. birthplace) before the actual domiciliu on the card
-  const adresaMatch = text.match(/Domiciliu[^\n]*\n[ \t]*([^\n]{5,150})/im)
-  if (adresaMatch) result.adresa_domiciliu = adresaMatch[1].trim()
-
-  return result
-}
-
-function parseCFText(text: string): ExtractedCFData {
-  const result: ExtractedCFData = {}
-
-  // Nr. Carte Funciara
-  const cfMatch =
-    text.match(/(?:Carte\s+Funciara|CF)\s+[Nn]r\.?\s*:?\s*(\d+)/i) ||
-    text.match(/[Nn]r\.?\s*(?:carte\s+funciara|CF)\s*:?\s*(\d+)/i)
-  if (cfMatch) result.nr_carte_funciara = cfMatch[1]
-
-  // Nr. Cadastral
-  const cadastralMatch =
-    text.match(/[Nn]r\.?\s+[Cc]adastral\s*:?\s*(\d+)/i) ||
-    text.match(/[Cc]adastral\s+[Nn]r\.?\s*:?\s*(\d+)/i)
-  if (cadastralMatch) result.nr_cadastral = cadastralMatch[1]
-
-  // Address/location
-  const adresaMatch =
-    text.match(/(?:Adresa|Adresă|Situata|situată|Amplasament)\s*:?\s*([^\n]{10,100})/im) ||
-    text.match(/(?:Str\.|Strada|Bulevardul|Calea|Intrarea)\s+[^\n]{5,80}/im)
-  if (adresaMatch) result.adresa_proprietate = adresaMatch[0].trim()
-
-  // Surface area (mp / m²)
-  const suprafataMatch =
-    text.match(/(\d+(?:[.,]\d+)?)\s*(?:mp|m²|m2|metri\s+patrati)/i)
-  if (suprafataMatch) result.suprafata = suprafataMatch[1].replace(',', '.')
-
-  return result
-}
-
-interface UploadCardProps {
-  title: string
-  description: string
-  previewUrl: string | null
-  loading: boolean
-  onFile: (file: File) => void
-  onClearPreview: () => void
-  children?: React.ReactNode
-}
-
-function UploadCard({
-  title,
-  description,
-  previewUrl,
-  loading,
-  onFile,
-  onClearPreview,
-  children,
-}: UploadCardProps) {
-  const fileRef = useRef<HTMLInputElement>(null)
-  const cameraRef = useRef<HTMLInputElement>(null)
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) onFile(file)
-    e.target.value = ''
-  }
-
-  return (
-    <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-3">
-      <div className="flex items-center gap-2">
-        <ScanLine className="w-4 h-4 text-blue-600" />
-        <span className="text-sm font-semibold text-blue-700">{title}</span>
-      </div>
-      <p className="text-xs text-blue-600">{description}</p>
-
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => cameraRef.current?.click()}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-lg text-sm font-medium transition-colors"
-        >
-          <Camera className="w-4 h-4" />
-          Fotografiază
-        </button>
-        <button
-          type="button"
-          onClick={() => fileRef.current?.click()}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-blue-200 hover:bg-blue-50 text-blue-700 rounded-lg text-sm font-medium transition-colors"
-        >
-          <Upload className="w-4 h-4" />
-          Încarcă fișier
-        </button>
-        {loading && (
-          <div className="flex items-center gap-2 text-sm text-blue-600">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            Se extrag datele...
-          </div>
-        )}
-      </div>
-
-      <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleChange} />
-      <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleChange} />
-
-      {previewUrl && (
-        <div className="relative inline-block">
-          <img src={previewUrl} alt="Document" className="h-20 rounded-lg object-cover border border-blue-200" />
-          <button
-            type="button"
-            onClick={onClearPreview}
-            className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center"
-          >
-            <X className="w-3 h-3 text-white" />
-          </button>
-        </div>
-      )}
-
-      {children}
-    </div>
-  )
-}
-
-interface FieldRowProps {
-  label: string
-  value?: string
-  onChange: (v: string) => void
-}
-
-function FieldRow({ label, value, onChange }: FieldRowProps) {
-  return (
-    <div>
-      <label className="label">{label}</label>
-      <input
-        type="text"
-        value={value ?? ''}
-        onChange={(e) => onChange(e.target.value)}
-        className="input-field"
-        placeholder="—"
-      />
-    </div>
-  )
-}
+const JUDETE = [
+  'Alba', 'Arad', 'Arges', 'Bacau', 'Bihor', 'Bistrita-Nasaud', 'Botosani', 'Brasov',
+  'Braila', 'Buzau', 'Caras-Severin', 'Calarasi', 'Cluj', 'Constanta', 'Covasna',
+  'Dambovita', 'Dolj', 'Galati', 'Giurgiu', 'Gorj', 'Harghita', 'Hunedoara', 'Ialomita',
+  'Iasi', 'Ilfov', 'Maramures', 'Mehedinti', 'Mures', 'Neamt', 'Olt', 'Prahova',
+  'Satu Mare', 'Salaj', 'Sibiu', 'Suceava', 'Teleorman', 'Timis', 'Tulcea', 'Vaslui',
+  'Valcea', 'Vrancea', 'Bucuresti',
+]
 
 export default function ACPClient() {
-  // Buletin identitate state
-  const [idPreview, setIdPreview] = useState<string | null>(null)
-  const [idLoading, setIdLoading] = useState(false)
-  const [idDone, setIdDone] = useState(false)
-  const [idData, setIdData] = useState<ExtractedIDData>({})
+  const [mode, setMode] = useState<'form' | 'text'>('form')
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<ACPResult | null>(null)
+  const [textQuery, setTextQuery] = useState('')
 
-  // Extras carte funciara state
-  const [cfPreview, setCfPreview] = useState<string | null>(null)
-  const [cfLoading, setCfLoading] = useState(false)
-  const [cfDone, setCfDone] = useState(false)
-  const [cfData, setCfData] = useState<ExtractedCFData>({})
+  const [formData, setFormData] = useState<ACPRequest>({
+    tip_proprietate: 'apartament',
+    judet: 'Ilfov',
+    localitate: '',
+    suprafata_mp: 0,
+    nr_camere: undefined,
+    an_constructie: undefined,
+    etaj: '',
+    observatii: '',
+  })
 
-  const runOCR = async (file: File): Promise<string> => {
-    const formData = new FormData()
-    formData.append('file', file)
-
-    const res = await fetch('/api/ocr', {
-      method: 'POST',
-      body: formData,
-    })
-
-    const data = await res.json()
-
-    if (!res.ok) {
-      const detail = data?.details ?? data?.error ?? 'OCR failed'
-      throw new Error(detail)
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.localitate || !formData.suprafata_mp) {
+      toast.error('Completeaza localitate si suprafata')
+      return
     }
-
-    return data.text ?? ''
+    await runAnalysis({ mode: 'form', data: formData })
   }
 
-  const handleIDFile = async (file: File) => {
-    const url = URL.createObjectURL(file)
-    setIdPreview(url)
-    setIdLoading(true)
-    setIdDone(false)
+  const handleTextSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!textQuery.trim()) {
+      toast.error('Introduceti o cerere de analiza')
+      return
+    }
+    await runAnalysis({ mode: 'text', query: textQuery })
+  }
+
+  const runAnalysis = async (payload: { mode: 'form'; data: ACPRequest } | { mode: 'text'; query: string }) => {
+    setLoading(true)
+    setResult(null)
 
     try {
-      const text = await runOCR(file)
-      const extracted = parseIDText(text)
-      setIdData(extracted)
-      setIdDone(true)
+      const res = await fetch('/api/acp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
 
-      const foundCount = Object.values(extracted).filter(Boolean).length
-      if (foundCount > 0) {
-        toast.success(`${foundCount} câmpuri extrase din buletin!`)
-      } else {
-        toast.error('Nu s-au putut extrage date. Verificați imaginea.')
-      }
+      if (!res.ok) throw new Error('Analysis failed')
+
+      const data = await res.json()
+      setResult(data)
+      toast.success('Analiza generata cu succes!')
     } catch {
-      toast.error('Eroare la procesare OCR. Încercați din nou.')
+      toast.error('Eroare la generarea analizei')
     } finally {
-      setIdLoading(false)
+      setLoading(false)
     }
   }
 
-  const handleCFFile = async (file: File) => {
-    const url = URL.createObjectURL(file)
-    setCfPreview(url)
-    setCfLoading(true)
-    setCfDone(false)
-
-    try {
-      const text = await runOCR(file)
-      const extracted = parseCFText(text)
-      setCfData(extracted)
-      setCfDone(true)
-
-      const foundCount = Object.values(extracted).filter(Boolean).length
-      if (foundCount > 0) {
-        toast.success(`${foundCount} câmpuri extrase din extras CF!`)
-      } else {
-        toast.error('Nu s-au putut extrage date. Verificați documentul.')
-      }
-    } catch {
-      toast.error('Eroare la procesare OCR. Încercați din nou.')
-    } finally {
-      setCfLoading(false)
-    }
-  }
-
-  const updateIdData = (field: keyof ExtractedIDData) => (value: string) => {
-    setIdData((prev) => ({ ...prev, [field]: value }))
-  }
-
-  const updateCfData = (field: keyof ExtractedCFData) => (value: string) => {
-    setCfData((prev) => ({ ...prev, [field]: value }))
+  const update = (field: keyof ACPRequest, value: unknown) => {
+    setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
   return (
-    <div className="space-y-8 max-w-3xl">
-      {/* Buletin Identitate Section */}
-      <div className="card space-y-4">
-        <div className="flex items-center gap-3 mb-1">
-          <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-            <FileText className="w-5 h-5 text-blue-600" />
-          </div>
-          <div>
-            <h2 className="font-semibold text-slate-900">Buletin de Identitate</h2>
-            <p className="text-sm text-slate-500">
-              Fotografiați sau încărcați buletinul pentru extragere automată date
-            </p>
-          </div>
-          {idDone && (
-            <div className="ml-auto flex items-center gap-1.5 text-sm text-green-600 font-medium">
-              <CheckCircle className="w-4 h-4" />
-              Date extrase
+    <div className="max-w-5xl">
+      {!result ? (
+        <div className="space-y-6">
+          {/* Mode toggle */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <div className="flex gap-2 mb-5">
+              <button
+                onClick={() => setMode('form')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  mode === 'form' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                <Layers className="w-4 h-4" />
+                Campuri structurate
+              </button>
+              <button
+                onClick={() => setMode('text')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  mode === 'text' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                <MessageSquare className="w-4 h-4" />
+                Cerere in text
+              </button>
             </div>
-          )}
-        </div>
 
-        <UploadCard
-          title="Scanare buletin identitate"
-          description="Fotografiați sau încărcați o imagine clară a buletinului de identitate"
-          previewUrl={idPreview}
-          loading={idLoading}
-          onFile={handleIDFile}
-          onClearPreview={() => {
-            setIdPreview(null)
-            setIdDone(false)
-            setIdData({})
-          }}
-        />
+            {mode === 'form' ? (
+              <form onSubmit={handleFormSubmit}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-5">
+                  <div>
+                    <label className="label">Tip proprietate</label>
+                    <select value={formData.tip_proprietate} onChange={(e) => update('tip_proprietate', e.target.value)} className="input-field">
+                      {(Object.keys(PROPERTY_TYPES) as PropertyType[]).map((t) => (
+                        <option key={t} value={t}>{PROPERTY_TYPES[t]}</option>
+                      ))}
+                    </select>
+                  </div>
 
-        {(idDone || Object.keys(idData).length > 0) && (
-          <div className="space-y-1">
-            {!idDone && Object.keys(idData).length === 0 && (
-              <div className="flex items-center gap-2 text-amber-600 text-sm mb-2">
-                <AlertCircle className="w-4 h-4" />
-                Completați manual câmpurile de mai jos
-              </div>
+                  <div>
+                    <label className="label">Judet</label>
+                    <select value={formData.judet} onChange={(e) => update('judet', e.target.value)} className="input-field">
+                      {JUDETE.map((j) => <option key={j} value={j}>{j}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="label">Localitate / Zona *</label>
+                    <input value={formData.localitate} onChange={(e) => update('localitate', e.target.value)} className="input-field" placeholder="ex: Voluntari, Pipera, Baneasa" required />
+                  </div>
+
+                  <div>
+                    <label className="label">Suprafata (mp) *</label>
+                    <input type="number" value={formData.suprafata_mp || ''} onChange={(e) => update('suprafata_mp', Number(e.target.value))} className="input-field" placeholder="ex: 75" required min={1} />
+                  </div>
+
+                  {(formData.tip_proprietate === 'apartament' || formData.tip_proprietate === 'casa') && (
+                    <div>
+                      <label className="label">Nr. camere</label>
+                      <input type="number" value={formData.nr_camere || ''} onChange={(e) => update('nr_camere', Number(e.target.value))} className="input-field" placeholder="ex: 3" min={1} max={20} />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="label">An constructie</label>
+                    <input type="number" value={formData.an_constructie || ''} onChange={(e) => update('an_constructie', Number(e.target.value))} className="input-field" placeholder="ex: 2010" min={1900} max={new Date().getFullYear()} />
+                  </div>
+
+                  {formData.tip_proprietate === 'apartament' && (
+                    <div>
+                      <label className="label">Etaj</label>
+                      <input value={formData.etaj || ''} onChange={(e) => update('etaj', e.target.value)} className="input-field" placeholder="ex: 3, parter, mansarda" />
+                    </div>
+                  )}
+
+                  <div className="sm:col-span-2 lg:col-span-3">
+                    <label className="label">Observatii / caracteristici speciale</label>
+                    <textarea value={formData.observatii || ''} onChange={(e) => update('observatii', e.target.value)} className="input-field resize-none" rows={2} placeholder="ex: vedere la parc, parcare subterana, renovat recent..." />
+                  </div>
+                </div>
+
+                <button type="submit" disabled={loading} className="flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 text-white rounded-xl font-semibold transition-colors">
+                  {loading ? <><Loader2 className="w-5 h-5 animate-spin" />Se analizeaza piata...</> : <><Sparkles className="w-5 h-5" />Genereaza analiza</>}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleTextSubmit}>
+                <div className="mb-4">
+                  <label className="label">Descriere proprietate (text liber)</label>
+                  <textarea value={textQuery} onChange={(e) => setTextQuery(e.target.value)} className="input-field resize-none" rows={5}
+                    placeholder="Ex: Vreau o analiza comparativa pentru un apartament de 3 camere in Voluntari, zona Pipera, 75 mp, etaj 3, construit in 2018..." required />
+                </div>
+                <button type="submit" disabled={loading} className="flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 text-white rounded-xl font-semibold transition-colors">
+                  {loading ? <><Loader2 className="w-5 h-5 animate-spin" />Se analizeaza...</> : <><Sparkles className="w-5 h-5" />Analizeaza</>}
+                </button>
+              </form>
             )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FieldRow label="Nume" value={idData.nume} onChange={updateIdData('nume')} />
-              <FieldRow label="Prenume" value={idData.prenume} onChange={updateIdData('prenume')} />
-              <FieldRow label="Serie buletin" value={idData.serie_buletin} onChange={updateIdData('serie_buletin')} />
-              <FieldRow label="Nr. buletin" value={idData.nr_buletin} onChange={updateIdData('nr_buletin')} />
-              <FieldRow label="CNP" value={idData.cnp} onChange={updateIdData('cnp')} />
-              <div className="sm:col-span-2">
-                <FieldRow
-                  label="Adresă domiciliu"
-                  value={idData.adresa_domiciliu}
-                  onChange={updateIdData('adresa_domiciliu')}
-                />
-              </div>
-            </div>
           </div>
-        )}
-      </div>
 
-      {/* Extras Carte Funciara Section */}
-      <div className="card space-y-4">
-        <div className="flex items-center gap-3 mb-1">
-          <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
-            <FileText className="w-5 h-5 text-emerald-600" />
+          {/* Info cards */}
+          <div className="grid grid-cols-3 gap-4">
+            {[
+              { icon: BarChart3, title: 'Analiza comparativa', desc: 'Comparatie cu proprietati similare din zona' },
+              { icon: TrendingUp, title: 'Tendinte piata', desc: 'Evolutia preturilor in ultimele luni' },
+              { icon: Download, title: 'Export PDF', desc: 'Raport profesional pentru clienti' },
+            ].map((item) => {
+              const Icon = item.icon
+              return (
+                <div key={item.title} className="bg-white rounded-xl border border-gray-100 p-4">
+                  <Icon className="w-5 h-5 text-purple-500 mb-2" />
+                  <p className="text-sm font-semibold text-slate-900 mb-1">{item.title}</p>
+                  <p className="text-xs text-slate-500">{item.desc}</p>
+                </div>
+              )
+            })}
           </div>
-          <div>
-            <h2 className="font-semibold text-slate-900">Extras Carte Funciară</h2>
-            <p className="text-sm text-slate-500">
-              Fotografiați sau încărcați extrasul de carte funciară al proprietății
-            </p>
-          </div>
-          {cfDone && (
-            <div className="ml-auto flex items-center gap-1.5 text-sm text-green-600 font-medium">
-              <CheckCircle className="w-4 h-4" />
-              Date extrase
-            </div>
-          )}
         </div>
-
-        <UploadCard
-          title="Scanare extras carte funciară"
-          description="Fotografiați sau încărcați extrasul CF pentru extragere automată a datelor cadastrale"
-          previewUrl={cfPreview}
-          loading={cfLoading}
-          onFile={handleCFFile}
-          onClearPreview={() => {
-            setCfPreview(null)
-            setCfDone(false)
-            setCfData({})
-          }}
+      ) : (
+        <ACPReport
+          result={result}
+          request={mode === 'form' ? formData : undefined}
+          textQuery={mode === 'text' ? textQuery : undefined}
+          onReset={() => setResult(null)}
         />
-
-        {(cfDone || Object.keys(cfData).length > 0) && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FieldRow
-              label="Nr. Carte Funciară"
-              value={cfData.nr_carte_funciara}
-              onChange={updateCfData('nr_carte_funciara')}
-            />
-            <FieldRow
-              label="Nr. Cadastral"
-              value={cfData.nr_cadastral}
-              onChange={updateCfData('nr_cadastral')}
-            />
-            <FieldRow
-              label="Suprafață (mp)"
-              value={cfData.suprafata}
-              onChange={updateCfData('suprafata')}
-            />
-            <div className="sm:col-span-2">
-              <FieldRow
-                label="Adresă proprietate"
-                value={cfData.adresa_proprietate}
-                onChange={updateCfData('adresa_proprietate')}
-              />
-            </div>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   )
 }

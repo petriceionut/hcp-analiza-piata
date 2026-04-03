@@ -1,86 +1,87 @@
-import { createAdminClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
+import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
-import SigningPage from '@/components/semnatura/SigningPage'
-import { Contract } from '@/types'
+import ClientSigningView from './ClientSigningView'
+
+function adminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+}
 
 export default async function SemneazaPage({
   params,
 }: {
   params: { token: string }
 }) {
-  const supabase = createAdminClient()
+  const supabase = adminClient()
 
-  // Find contract by client token
-  const { data: contract } = await supabase
-    .from('contracts')
-    .select('*')
-    .or(`client_token.eq.${params.token},agent_token.eq.${params.token}`)
+  const { data: sigReq, error } = await supabase
+    .from('signature_requests')
+    .select(`
+      token, status, client_name, client_email, contract_text,
+      contracts ( client_data )
+    `)
+    .eq('token', params.token)
     .single()
 
-  if (!contract) notFound()
+  if (error || !sigReq) notFound()
 
-  const c = contract as Contract
-  const isClientToken = c.client_token === params.token
-  const isAgentToken = c.agent_token === params.token
-
-  // Check if already signed
-  if (isClientToken && c.client_semnat_la) {
+  if (sigReq.status === 'signed' || sigReq.status === 'semnat_client' || sigReq.status === 'semnat_complet') {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-md text-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 max-w-md w-full text-center">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h1 className="text-xl font-bold text-slate-900 mb-2">Contract deja semnat</h1>
-          <p className="text-slate-500">Ati semnat deja acest contract. Multumim!</p>
+          <h1 className="text-xl font-bold text-slate-900 mb-2">Document deja semnat</h1>
+          <p className="text-slate-500">Ați semnat deja acest document. Mulțumim!</p>
         </div>
       </div>
     )
   }
 
-  if (isAgentToken && c.agent_semnat_la) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-md text-center">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <h1 className="text-xl font-bold text-slate-900 mb-2">Contract deja semnat</h1>
-          <p className="text-slate-500">Ati semnat deja acest contract.</p>
-        </div>
-      </div>
-    )
-  }
+  const headersList = headers()
+  const ip = headersList.get('x-forwarded-for')?.split(',')[0]?.trim()
+    ?? headersList.get('x-real-ip')
+    ?? 'necunoscut'
+  const ua = headersList.get('user-agent') ?? ''
+  const device = parseUserAgent(ua)
 
-  // Agent must wait for client to sign first
-  if (isAgentToken && !c.client_semnat_la) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-md text-center">
-          <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <h1 className="text-xl font-bold text-slate-900 mb-2">In asteptare</h1>
-          <p className="text-slate-500">
-            Contractul va fi disponibil pentru semnare dupa ce clientul{' '}
-            <strong>{c.client_data?.prenume} {c.client_data?.nume}</strong> il semneaza.
-          </p>
-        </div>
-      </div>
-    )
-  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const contractData = sigReq.contracts as any
+  const telefon: string = contractData?.client_data?.telefon ?? ''
 
   return (
-    <SigningPage
-      contract={c}
-      token={params.token}
-      signerType={isClientToken ? 'client' : 'agent'}
+    <ClientSigningView
+      token={sigReq.token}
+      contractText={sigReq.contract_text}
+      clientName={sigReq.client_name}
+      clientEmail={sigReq.client_email}
+      telefon={telefon}
+      ip={ip}
+      device={device}
     />
   )
+}
+
+function parseUserAgent(ua: string): string {
+  let browser = 'Browser'
+  if (ua.includes('Edg/'))      browser = `Edge ${ua.match(/Edg\/(\d+)/)?.[1] ?? ''}`
+  else if (ua.includes('Chrome')) browser = `Chrome ${ua.match(/Chrome\/(\d+)/)?.[1] ?? ''}`
+  else if (ua.includes('Firefox')) browser = `Firefox ${ua.match(/Firefox\/(\d+)/)?.[1] ?? ''}`
+  else if (ua.includes('Safari'))  browser = `Safari ${ua.match(/Version\/(\d+)/)?.[1] ?? ''}`
+
+  let os = 'OS'
+  if (ua.includes('Windows NT 10.0')) os = 'Windows 10/11'
+  else if (ua.includes('Windows'))     os = 'Windows'
+  else if (ua.includes('Mac OS X'))    os = 'macOS'
+  else if (ua.includes('Android'))     os = `Android ${ua.match(/Android (\d+)/)?.[1] ?? ''}`
+  else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS'
+  else if (ua.includes('Linux'))       os = 'Linux'
+
+  return `${browser} / ${os}`
 }

@@ -34,6 +34,7 @@ export async function middleware(request: NextRequest) {
   const publicRoutes = [
     '/login',
     '/semneaza',
+    '/semneaza-agent',
     '/dealroom-client',
     '/oferta-acceptata',
     '/api/',
@@ -46,6 +47,13 @@ export async function middleware(request: NextRequest) {
   if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
+    // In development, preserve ?dev=true so the login page can auto-login
+    if (
+      process.env.NODE_ENV === 'development' &&
+      request.nextUrl.searchParams.get('dev') === 'true'
+    ) {
+      url.searchParams.set('dev', 'true')
+    }
     return NextResponse.redirect(url)
   }
 

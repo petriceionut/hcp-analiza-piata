@@ -1,102 +1,166 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { NextResponse } from 'next/server'
+import { sendEmail } from '@/lib/email'
 
-// ─── Supabase (service role — bypasses RLS) ──────────────────────────────────
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error('Supabase env vars missing')
-  return createClient(url, key)
+function getAdminClient() {
+  return createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
 }
 
-const N8N_WEBHOOK = 'https://petriceionut.app.n8n.cloud/webhook/signwell-trimite'
-
-// ─── Route handler ────────────────────────────────────────────────────────────
 export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } },
+  request: Request,
+  { params }: { params: { id: string } }
 ) {
-  const contractId = params.id
-  console.log(`[trimite] START contractId=${contractId}`)
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
 
-  // ── 1. Parse request body ──────────────────────────────────────────────────
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // Parse body — method + contractText from StepPreview
   let body: Record<string, unknown>
   try {
     body = await request.json()
-  } catch (e) {
-    console.error('[trimite] 1 FAIL – parse body:', e)
+  } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
+  const method       = typeof body.method       === 'string' ? body.method       : 'email'
   const contractText = typeof body.contractText === 'string' ? body.contractText : ''
-  const clientEmail  = typeof body.clientEmail  === 'string' ? body.clientEmail  : ''
-  const clientName   = typeof body.clientName   === 'string' ? body.clientName   : 'Client'
 
-  console.log(`[trimite] 1 OK – clientEmail=${clientEmail} clientName=${clientName}`)
+  // Get contract (verify ownership)
+  const { data: contract, error: contractError } = await supabase
+    .from('contracts')
+    .select('*')
+    .eq('id', params.id)
+    .eq('agent_id', user.id)
+    .single()
+
+  if (contractError || !contract) {
+    return NextResponse.json({ error: 'Contract not found' }, { status: 404 })
+  }
+
+  const clientEmail = contract.client_data?.email ?? ''
+  const clientName  = `${contract.client_data?.prenume ?? ''} ${contract.client_data?.nume ?? ''}`.trim() || 'Client'
 
   if (!clientEmail) {
-    return NextResponse.json({ error: 'clientEmail is required' }, { status: 400 })
+    return NextResponse.json({ error: 'clientEmail missing on contract' }, { status: 400 })
   }
 
-  // ── 2. Call n8n webhook (n8n handles SignWell) ─────────────────────────────
-  let n8nStatus = 0
-  let n8nBody   = ''
-  try {
-    const n8nPayload = { contractText, clientEmail, clientName, contractId }
-    console.log(`[trimite] 2 – POST ${N8N_WEBHOOK} | clientEmail=${clientEmail} contractId=${contractId}`)
-
-    const n8nRes = await fetch(N8N_WEBHOOK, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(n8nPayload),
+  // Insert into signature_requests — this generates a UUID token
+  const admin = getAdminClient()
+  const { data: sigReq, error: sigErr } = await admin
+    .from('signature_requests')
+    .insert({
+      contract_id:   params.id,
+      client_email:  clientEmail,
+      client_name:   clientName,
+      contract_text: contractText,
+      status:        'pending',
     })
+    .select('token')
+    .single()
 
-    n8nStatus = n8nRes.status
-    n8nBody   = await n8nRes.text()
-    console.log(`[trimite] 2 – n8n response status=${n8nStatus} body=${n8nBody}`)
+  if (sigErr || !sigReq) {
+    console.error('[trimite] failed to insert signature_request:', sigErr)
+    return NextResponse.json({ error: 'Failed to create signature request', detail: sigErr?.message }, { status: 500 })
+  }
 
-    if (!n8nRes.ok) {
-      return NextResponse.json(
-        { error: 'n8n webhook error', detail: n8nBody, httpStatus: n8nStatus },
-        { status: 502 },
+  const appUrl     = process.env.NEXT_PUBLIC_APP_URL ?? 'https://hcp-analiza-piata.vercel.app'
+  const signingLink = `${appUrl}/semneaza/${sigReq.token}`
+
+  let deliveryWarning: string | undefined
+
+  if (method === 'email') {
+    try {
+      await sendEmail(
+        clientEmail,
+        'Contract pentru semnare — HCP Imobiliare',
+        buildEmailTemplate(clientName, signingLink, contract.tip_contract),
       )
+    } catch (e) {
+      console.error('Email send error:', e)
+      deliveryWarning = 'Email sending failed. Check GMAIL_USER/GMAIL_APP_PASSWORD.'
     }
-  } catch (e) {
-    console.error('[trimite] 2 FAIL – fetch to n8n:', e)
-    return NextResponse.json({ error: 'Failed to reach n8n webhook', detail: String(e) }, { status: 502 })
-  }
-
-  // ── 3. Parse n8n response for documentId (best-effort) ────────────────────
-  let documentId: string | null = null
-  try {
-    const n8nData = n8nBody ? JSON.parse(n8nBody) : {}
-    documentId =
-      (n8nData?.documentId     as string | undefined) ??
-      (n8nData?.id             as string | undefined) ??
-      (n8nData?.data?.id       as string | undefined) ??
-      null
-    console.log(`[trimite] 3 OK – documentId=${documentId}`)
-  } catch (e) {
-    console.warn('[trimite] 3 WARN – could not parse n8n response (non-fatal):', e)
-  }
-
-  // ── 4. Update Supabase (best-effort — n8n already succeeded) ──────────────
-  try {
-    const supabase = getSupabase()
-    const update: Record<string, unknown> = { status: 'trimis_client' }
-    if (documentId) update.signwell_document_id = documentId
-
-    const { error } = await supabase.from('contracts').update(update).eq('id', contractId)
-    if (error) {
-      console.error('[trimite] 4 WARN – Supabase update failed (non-fatal):', error)
-    } else {
-      console.log(`[trimite] 4 OK – Supabase updated status=trimis_client`)
+  } else if (method === 'whatsapp') {
+    try {
+      await sendWhatsApp({
+        to: contract.client_data.telefon,
+        message: `Buna ziua, ${clientName}! Aveti un contract de semnat de la HCP Imobiliare. Accesati link-ul urmator pentru a vizualiza si semna contractul: ${signingLink}`,
+      })
+    } catch (e) {
+      console.error('WhatsApp send error:', e)
+      deliveryWarning = 'WhatsApp sending failed. Check Twilio credentials.'
     }
-  } catch (e) {
-    console.error('[trimite] 4 WARN – Supabase threw (non-fatal):', e)
   }
 
-  // ── 5. Return success ──────────────────────────────────────────────────────
-  console.log(`[trimite] DONE contractId=${contractId} documentId=${documentId}`)
-  return NextResponse.json({ success: true, documentId })
+  // Update contract status
+  await admin
+    .from('contracts')
+    .update({ status: 'trimis_client' })
+    .eq('id', params.id)
+
+  return NextResponse.json({ success: true, signingLink, warning: deliveryWarning })
+}
+
+async function sendWhatsApp({ to, message }: { to: string; message: string }) {
+  if (!process.env.TWILIO_ACCOUNT_SID) {
+    console.log(`[WHATSAPP MOCK] To: ${to}\nMessage: ${message}`)
+    return
+  }
+
+  const formattedTo = `whatsapp:+4${to.replace(/^0/, '')}`
+
+  const res = await fetch(
+    `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}/Messages.json`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${Buffer.from(
+          `${process.env.TWILIO_ACCOUNT_SID}:${process.env.TWILIO_AUTH_TOKEN}`
+        ).toString('base64')}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        From: process.env.TWILIO_WHATSAPP_FROM ?? 'whatsapp:+14155238886',
+        To: formattedTo,
+        Body: message,
+      }),
+    }
+  )
+
+  if (!res.ok) throw new Error('WhatsApp API error')
+}
+
+function buildEmailTemplate(clientName: string, signingLink: string, contractType: string): string {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="background: #1e40af; padding: 20px; border-radius: 12px 12px 0 0; text-align: center;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">HCP Imobiliare</h1>
+      </div>
+      <div style="background: #f8fafc; padding: 30px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none;">
+        <p style="font-size: 16px; color: #1e293b;">Buna ziua, <strong>${clientName}</strong>,</p>
+        <p style="color: #475569;">Va rugam sa accesati link-ul de mai jos pentru a vizualiza si semna contractul:</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${signingLink}" style="background: #2563eb; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px;">
+            Semneaza contractul
+          </a>
+        </div>
+        <p style="color: #94a3b8; font-size: 12px;">
+          Sau copiati acest link in browser: ${signingLink}
+        </p>
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+        <p style="color: #94a3b8; font-size: 12px; text-align: center;">
+          HCP Imobiliare &bull; Platforma de semnatura digitala
+        </p>
+      </div>
+    </body>
+    </html>
+  `
 }
