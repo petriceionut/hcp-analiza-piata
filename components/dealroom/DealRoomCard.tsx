@@ -113,7 +113,7 @@ export default function DealRoomCard({ dr }: { dr: DealRoom }) {
             className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-emerald-200 text-emerald-700 text-sm font-medium hover:bg-emerald-50 transition-colors"
           >
             <UserPlus className="w-4 h-4" />
-            Adaugă vizitator
+            Adaugă client
           </button>
         </div>
       </div>
