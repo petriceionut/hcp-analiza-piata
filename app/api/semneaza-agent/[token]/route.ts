@@ -197,7 +197,7 @@ export async function POST(
   const { data: sigReq, error: fetchErr } = await supabase
     .from('signature_requests')
     .select(`
-      *, contracts ( client_data, property_data, tip_contract, agent_id )
+      *, contracts ( client_data, property_data, tip_contract, agent_id, status )
     `)
     .eq('token', token)
     .single()
@@ -205,7 +205,10 @@ export async function POST(
   if (fetchErr || !sigReq) {
     return NextResponse.json({ error: 'Link invalid sau expirat' }, { status: 404 })
   }
-  if (sigReq.status === 'semnat_complet') {
+  // In v1 schema, status='signed' after EITHER party signs — use contracts.status to distinguish
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const contractStatus = (sigReq.contracts as any)?.status as string | undefined
+  if (sigReq.status === 'semnat_complet' || contractStatus === 'semnat_ambele' || contractStatus === 'finalizat') {
     return NextResponse.json({ error: 'Contract deja semnat complet' }, { status: 409 })
   }
   if (sigReq.status === 'pending') {

@@ -49,7 +49,7 @@ export default async function SemneazaAgentPage({
       id, token, status,
       client_name, client_email, contract_text,
       signed_at, signer_ip,
-      contracts ( client_data )
+      contracts ( client_data, status )
     `)
     .eq('token', params.token)
     .single()
@@ -98,6 +98,23 @@ export default async function SemneazaAgentPage({
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const contract = sigReq.contracts as any
+
+  // In v1 schema, status='signed' after both client and agent sign — use contracts.status
+  if (contract?.status === 'semnat_ambele' || contract?.status === 'finalizat') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 max-w-md w-full text-center">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h1 className="text-xl font-bold text-slate-900 mb-2">Contract semnat complet</h1>
+          <p className="text-slate-500">Ambele părți au semnat documentul.</p>
+        </div>
+      </div>
+    )
+  }
 
   const clientSignedBlock = sigReq.signed_at
     ? {
