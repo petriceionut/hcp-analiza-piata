@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { sendEmail } from '@/lib/email'
 
 export async function POST(request: Request) {
   const supabase = createAdminClient()
@@ -77,24 +78,12 @@ async function notifyAgentToSign(contract: Record<string, unknown>, supabase: Re
 
   if (agentEmail) {
     try {
-      if (process.env.RESEND_API_KEY) {
-        await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            from: process.env.EMAIL_FROM ?? 'onboarding@resend.dev',
-            to: agentEmail,
-            subject: `${clientName} a semnat contractul — semnatura ta este necesara`,
-            html: `<p>Clientul <strong>${clientName}</strong> a semnat contractul. Acceseaza link-ul de mai jos pentru a semna si tu:</p>
-                   <p><a href="${agentSignLink}">${agentSignLink}</a></p>`,
-          }),
-        })
-      } else {
-        console.log(`[AGENT SIGN NOTIFICATION] Email: ${agentEmail}, Link: ${agentSignLink}`)
-      }
+      await sendEmail(
+        agentEmail,
+        `${clientName} a semnat contractul — semnatura ta este necesara`,
+        `<p>Clientul <strong>${clientName}</strong> a semnat contractul. Acceseaza link-ul de mai jos pentru a semna si tu:</p>
+         <p><a href="${agentSignLink}">${agentSignLink}</a></p>`,
+      )
     } catch (e) {
       console.error('Failed to notify agent:', e)
     }
@@ -124,26 +113,17 @@ async function createDealRoom(contract: Record<string, unknown>, supabase: Retur
 
 async function sendSignedCopyToClient(contract: Record<string, unknown>, supabase: ReturnType<typeof import('@/lib/supabase/server').createAdminClient>) {
   const clientData = contract.client_data as Record<string, string>
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 
-  if (process.env.RESEND_API_KEY && clientData?.email) {
+  if (clientData?.email) {
     try {
-      await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from: process.env.EMAIL_FROM ?? 'onboarding@resend.dev',
-          to: clientData.email,
-          subject: 'Contractul a fost semnat de ambele parti — HCP Imobiliare',
-          html: `<p>Buna ziua, <strong>${clientData.prenume} ${clientData.nume}</strong>!</p>
-                 <p>Contractul a fost semnat de ambele parti si este acum finalizat.</p>
-                 <p>Va multumim pentru incredere!</p>
-                 <p><em>HCP Imobiliare</em></p>`,
-        }),
-      })
+      await sendEmail(
+        clientData.email,
+        'Contractul a fost semnat de ambele parti — HCP Imobiliare',
+        `<p>Buna ziua, <strong>${clientData.prenume} ${clientData.nume}</strong>!</p>
+         <p>Contractul a fost semnat de ambele parti si este acum finalizat.</p>
+         <p>Va multumim pentru incredere!</p>
+         <p><em>HCP Imobiliare</em></p>`,
+      )
     } catch (e) {
       console.error('Failed to send signed copy:', e)
     }

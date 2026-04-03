@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { sendEmail } from '@/lib/email'
 
 const AGENT_EMAIL      = 'joan.petrice@homoecapital.ro'
 const AGENT_NAME       = 'Petrice Ioan'
@@ -114,19 +115,6 @@ async function uploadPDF(supabase: ReturnType<typeof adminClient>, token: string
 
   const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path)
   return data.publicUrl
-}
-
-// ── Send email via Resend ─────────────────────────────────────────────────────
-async function sendEmail(to: string, subject: string, html: string) {
-  const key = process.env.RESEND_API_KEY
-  if (!key) { console.warn('[semneaza] RESEND_API_KEY not set'); return }
-
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: 'onboarding@resend.dev', to, subject, html }),
-  })
-  if (!res.ok) console.error('[semneaza] Resend error:', res.status, await res.text())
 }
 
 // ── Route handler ─────────────────────────────────────────────────────────────

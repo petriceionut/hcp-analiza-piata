@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { generateToken } from '@/lib/utils'
+import { sendEmail } from '@/lib/email'
 
 export async function POST(
   request: Request,
@@ -138,39 +139,26 @@ async function sendBuyerEmail(
   buyerLink: string,
   adresa: string
 ) {
-  if (!process.env.RESEND_API_KEY) {
-    console.log(`[EMAIL MOCK] Buyer invite to: ${email}`)
-    return
-  }
-
-  await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: process.env.EMAIL_FROM ?? 'onboarding@resend.dev',
-      to: email,
-      subject: 'Invitatie DealRoom — HCP Imobiliare',
-      html: `
-        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">
-          <div style="background:#1d4ed8;padding:20px;border-radius:12px 12px 0 0;text-align:center">
-            <h1 style="color:white;margin:0">HCP DealRoom</h1>
-          </div>
-          <div style="background:#f8fafc;padding:30px;border-radius:0 0 12px 12px;border:1px solid #e2e8f0;border-top:none">
-            <p>Buna ziua, <strong>${prenume} ${nume}</strong>!</p>
-            <p>Ati fost invitat sa vizualizati o proprietate: <strong>${adresa}</strong></p>
-            <p>Accesati spatiul securizat de negociere:</p>
-            <div style="text-align:center;margin:30px 0">
-              <a href="${buyerLink}" style="background:#2563eb;color:white;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:bold">
-                Acceseaza DealRoom
-              </a>
-            </div>
-            <p style="color:#94a3b8;font-size:12px">Sau copiati: ${buyerLink}</p>
-          </div>
+  await sendEmail(
+    email,
+    'Invitatie DealRoom — HCP Imobiliare',
+    `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">
+        <div style="background:#1d4ed8;padding:20px;border-radius:12px 12px 0 0;text-align:center">
+          <h1 style="color:white;margin:0">HCP DealRoom</h1>
         </div>
-      `,
-    }),
-  })
+        <div style="background:#f8fafc;padding:30px;border-radius:0 0 12px 12px;border:1px solid #e2e8f0;border-top:none">
+          <p>Buna ziua, <strong>${prenume} ${nume}</strong>!</p>
+          <p>Ati fost invitat sa vizualizati o proprietate: <strong>${adresa}</strong></p>
+          <p>Accesati spatiul securizat de negociere:</p>
+          <div style="text-align:center;margin:30px 0">
+            <a href="${buyerLink}" style="background:#2563eb;color:white;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:bold">
+              Acceseaza DealRoom
+            </a>
+          </div>
+          <p style="color:#94a3b8;font-size:12px">Sau copiati: ${buyerLink}</p>
+        </div>
+      </div>
+    `,
+  )
 }

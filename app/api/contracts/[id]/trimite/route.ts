@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { sendEmail } from '@/lib/email'
 
 function getAdminClient() {
   return createAdminClient(
@@ -76,14 +77,14 @@ export async function POST(
 
   if (method === 'email') {
     try {
-      await sendEmail({
-        to: clientEmail,
-        subject: 'Contract pentru semnare — HCP Imobiliare',
-        html: buildEmailTemplate(clientName, signingLink, contract.tip_contract),
-      })
+      await sendEmail(
+        clientEmail,
+        'Contract pentru semnare — HCP Imobiliare',
+        buildEmailTemplate(clientName, signingLink, contract.tip_contract),
+      )
     } catch (e) {
       console.error('Email send error:', e)
-      deliveryWarning = 'Email sending failed. Check RESEND_API_KEY.'
+      deliveryWarning = 'Email sending failed. Check GMAIL_USER/GMAIL_APP_PASSWORD.'
     }
   } else if (method === 'whatsapp') {
     try {
@@ -104,40 +105,6 @@ export async function POST(
     .eq('id', params.id)
 
   return NextResponse.json({ success: true, signingLink, warning: deliveryWarning })
-}
-
-async function sendEmail({
-  to,
-  subject,
-  html,
-}: {
-  to: string
-  subject: string
-  html: string
-}) {
-  if (!process.env.RESEND_API_KEY) {
-    console.log(`[EMAIL MOCK] To: ${to}\nSubject: ${subject}`)
-    return
-  }
-
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: process.env.EMAIL_FROM ?? 'onboarding@resend.dev',
-      to,
-      subject,
-      html,
-    }),
-  })
-
-  if (!res.ok) {
-    const body = await res.text()
-    throw new Error(`Resend API error ${res.status}: ${body}`)
-  }
 }
 
 async function sendWhatsApp({ to, message }: { to: string; message: string }) {

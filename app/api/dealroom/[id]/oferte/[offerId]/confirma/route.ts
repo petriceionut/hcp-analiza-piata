@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { sendEmail } from '@/lib/email'
 
 export async function POST(
   request: Request,
@@ -80,37 +81,24 @@ async function notifyWinningBuyer(
   suma: number,
   adresa: string
 ) {
-  if (!process.env.RESEND_API_KEY) {
-    console.log(`[EMAIL MOCK] Winning buyer notification to: ${email}`)
-    return
-  }
-
   const formatEUR = (n: number) =>
     new Intl.NumberFormat('ro-RO', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0 }).format(n)
 
-  await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: process.env.EMAIL_FROM ?? 'onboarding@resend.dev',
-      to: email,
-      subject: 'Oferta ta a fost acceptata! — HCP Imobiliare',
-      html: `
-        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">
-          <div style="background:#16a34a;padding:20px;border-radius:12px 12px 0 0;text-align:center">
-            <h1 style="color:white;margin:0">🎉 Felicitari!</h1>
-          </div>
-          <div style="background:#f0fdf4;padding:30px;border-radius:0 0 12px 12px;border:1px solid #bbf7d0;border-top:none">
-            <p>Buna ziua, <strong>${prenume} ${nume}</strong>!</p>
-            <p>Oferta dumneavoastra de <strong>${formatEUR(suma)}</strong> pentru proprietatea <strong>${adresa}</strong> a fost <strong>acceptata</strong>!</p>
-            <p>Agentul imobiliar va lua legatura cu dumneavoastra in cel mai scurt timp pentru a finaliza tranzactia.</p>
-            <p>Va multumim ca ati ales HCP Imobiliare!</p>
-          </div>
+  await sendEmail(
+    email,
+    'Oferta ta a fost acceptata! — HCP Imobiliare',
+    `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">
+        <div style="background:#16a34a;padding:20px;border-radius:12px 12px 0 0;text-align:center">
+          <h1 style="color:white;margin:0">Felicitari!</h1>
         </div>
-      `,
-    }),
-  })
+        <div style="background:#f0fdf4;padding:30px;border-radius:0 0 12px 12px;border:1px solid #bbf7d0;border-top:none">
+          <p>Buna ziua, <strong>${prenume} ${nume}</strong>!</p>
+          <p>Oferta dumneavoastra de <strong>${formatEUR(suma)}</strong> pentru proprietatea <strong>${adresa}</strong> a fost <strong>acceptata</strong>!</p>
+          <p>Agentul imobiliar va lua legatura cu dumneavoastra in cel mai scurt timp pentru a finaliza tranzactia.</p>
+          <p>Va multumim ca ati ales HCP Imobiliare!</p>
+        </div>
+      </div>
+    `,
+  )
 }

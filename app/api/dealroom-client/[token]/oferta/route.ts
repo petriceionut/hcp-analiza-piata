@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { sendEmail } from '@/lib/email'
 
 export async function POST(
   request: Request,
@@ -97,22 +98,14 @@ export async function POST(
 
   // Also notify agent
   const { data: agentData } = await supabase.auth.admin.getUserById(dealroom.agent_id)
-  if (agentData?.user?.email && process.env.RESEND_API_KEY) {
-    await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: process.env.EMAIL_FROM ?? 'onboarding@resend.dev',
-        to: agentData.user.email,
-        subject: `Oferta noua: ${suma} EUR — ${dealroom.adresa_scurta}`,
-        html: `<p>Ai primit o oferta noua de <strong>${suma} EUR</strong> pentru proprietatea <strong>${dealroom.adresa_scurta}</strong>.</p>
-               ${mesaj ? `<p>Mesaj: "${mesaj}"</p>` : ''}
-               <p>Logheaza-te in aplicatie pentru a vedea si gestiona oferta.</p>`,
-      }),
-    }).catch(console.error)
+  if (agentData?.user?.email) {
+    sendEmail(
+      agentData.user.email,
+      `Oferta noua: ${suma} EUR — ${dealroom.adresa_scurta}`,
+      `<p>Ai primit o oferta noua de <strong>${suma} EUR</strong> pentru proprietatea <strong>${dealroom.adresa_scurta}</strong>.</p>
+       ${mesaj ? `<p>Mesaj: "${mesaj}"</p>` : ''}
+       <p>Logheaza-te in aplicatie pentru a vedea si gestiona oferta.</p>`,
+    ).catch(console.error)
   } else {
     console.log(`[AGENT OFFER NOTIFY] New offer: ${suma} EUR for ${dealroom.adresa_scurta}`)
   }
