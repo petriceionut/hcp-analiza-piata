@@ -267,26 +267,6 @@ export default function ACPClient() {
     }
   }
 
-  const downloadPdf = async () => {
-    const filled = comparabile.filter((c, i) =>
-      i === 0 || (c.judet && c.localitate.trim() && c.suprafata > 0 && c.pret_cerut > 0)
-    )
-    try {
-      const res = await fetch('/api/acp/pdf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subiect, comparabile: filled, result }),
-      })
-      if (!res.ok) throw new Error()
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url; a.download = `ACP-${subiect.localitate || subiect.judet}.html`; a.click()
-    } catch {
-      toast.error('Eroare la export')
-    }
-  }
-
   const reset = () => {
     setResult(null); setStep(1)
     setSubiect(defaultSubiect())
@@ -305,13 +285,34 @@ export default function ACPClient() {
     const dateRo = new Date().toLocaleDateString('ro-RO', { day: '2-digit', month: 'long', year: 'numeric' })
 
     return (
-      <div className="max-w-4xl space-y-6">
-        {/* Action bar */}
-        <div className="flex items-center justify-between">
+      <div className="acp-print-root max-w-4xl space-y-6">
+        {/* Print styles */}
+        <style>{`
+          @media print {
+            /* Hide UI chrome */
+            nav, aside, header, [data-sidebar],
+            .acp-action-bar,
+            #__next > *:not(.acp-print-root) { display: none !important; }
+            /* Full width report */
+            body, html { margin: 0; padding: 0; }
+            .acp-print-root { max-width: 100% !important; padding: 0 !important; }
+            /* Ensure colors print */
+            * {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              color-adjust: exact !important;
+            }
+            /* Ensure images print */
+            img { display: block !important; visibility: visible !important; }
+          }
+        `}</style>
+
+        {/* Action bar — hidden on print */}
+        <div className="acp-action-bar flex items-center justify-between">
           <button onClick={reset} className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700">
             <ArrowLeft className="w-4 h-4" /> Analiza noua
           </button>
-          <button onClick={downloadPdf} className="flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium hover:opacity-90" style={{ backgroundColor: NAVY }}>
+          <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium hover:opacity-90" style={{ backgroundColor: NAVY }}>
             <Download className="w-4 h-4" /> Export PDF
           </button>
         </div>
