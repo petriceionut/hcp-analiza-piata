@@ -359,67 +359,52 @@ export default function ACPClient() {
           <p className="mt-3 text-blue-300 text-xs">Pret mediu/mp comparabile: {fmtEUR(avgPretMp)}/mp</p>
         </div>
 
-        {/* Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Bar chart — inline HTML/CSS */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <h3 className="font-semibold text-slate-900 mb-4 text-sm">Comparatie €/mp</h3>
-            {(() => {
-              const rows = [
-                { label: locatieScurta(subiect) || 'Subiect', pretMp: subiectPretMp, isSubiect: true },
-                ...filledComps.map(c => ({
-                  label: locatieScurta(c),
-                  pretMp: Math.round(c.pret_cerut / c.suprafata),
-                  isSubiect: false,
-                })),
-              ]
-              const maxVal = Math.max(...rows.map(r => r.pretMp).filter(v => v > 0 && isFinite(v)), 1)
-              return (
-                <div>
-                  {rows.map((row, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', margin: '8px 0' }}>
-                      <div style={{ width: '120px', fontSize: '12px', textAlign: 'right', paddingRight: '8px', color: '#64748b', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {row.label}
-                      </div>
-                      <div style={{
-                        background: row.isSubiect ? '#0f2557' : '#4a90d9',
-                        height: '24px',
-                        width: `${Math.max((row.pretMp / maxVal) * 80, 2)}%`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '0 8px',
-                        color: 'white',
-                        fontSize: '12px',
-                        borderRadius: '4px',
-                        minWidth: '48px',
-                      }}>
-                        {row.pretMp > 0 ? `${fmtEUR(row.pretMp)}/mp` : ''}
-                      </div>
-                    </div>
-                  ))}
-                  <div style={{ display: 'flex', gap: '16px', marginTop: '8px', paddingLeft: '128px' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#94a3b8' }}>
-                      <span style={{ width: 12, height: 12, background: '#0f2557', display: 'inline-block', borderRadius: 2 }} />{' '}Subiect
-                    </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#94a3b8' }}>
-                      <span style={{ width: 12, height: 12, background: '#4a90d9', display: 'inline-block', borderRadius: 2 }} />{' '}Comparabile
-                    </span>
-                  </div>
+        {/* Charts — inline bar chart directly after summary */}
+        <div style={{ marginBottom: '24px' }}>
+          <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#0f2557', marginBottom: '12px' }}>Comparatie Pret/mp</h3>
+          {(() => {
+            const allItems = [
+              { label: 'Proprietatea subiect', value: subiectPretMp, isSubject: true },
+              ...filledComps.map((c, i) => ({
+                label: `Comp. ${i + 1}`,
+                value: Math.round(c.pret_cerut / c.suprafata),
+                isSubject: false,
+              })),
+            ].filter(item => item.value > 0)
+            const maxVal = Math.max(...allItems.map(item => item.value), 1)
+            return allItems.map((item, idx) => (
+              <div key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: '8px', gap: '8px' }}>
+                <div style={{ width: '140px', fontSize: '12px', color: '#374151', flexShrink: 0 }}>{item.label}</div>
+                <div style={{
+                  background: item.isSubject ? '#0f2557' : '#4a90d9',
+                  height: '28px',
+                  width: `${(item.value / maxVal) * 70}%`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  paddingLeft: '8px',
+                  color: 'white',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  borderRadius: '4px',
+                  minWidth: '50px',
+                }}>
+                  {item.value}€/mp
                 </div>
-              )
-            })()}
-          </div>
-          {/* Gauge */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <h3 className="font-semibold text-slate-900 mb-1 text-sm">Pozitionare pret</h3>
-            <p className="text-xs text-slate-400 mb-2">Interval recomandat vs pret solicitat</p>
-            <PriceGauge
-              min={result.pret_recomandat_min}
-              max={result.pret_recomandat_max}
-              rec={result.pret_recomandat}
-              clientPrice={subiect.pret_solicitat}
-            />
-          </div>
+              </div>
+            ))
+          })()}
+        </div>
+
+        {/* Price gauge */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-5">
+          <h3 className="font-semibold text-slate-900 mb-1 text-sm">Pozitionare pret</h3>
+          <p className="text-xs text-slate-400 mb-2">Interval recomandat vs pret solicitat</p>
+          <PriceGauge
+            min={result.pret_recomandat_min}
+            max={result.pret_recomandat_max}
+            rec={result.pret_recomandat}
+            clientPrice={subiect.pret_solicitat}
+          />
         </div>
 
         {/* Analysis */}
