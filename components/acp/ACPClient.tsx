@@ -82,73 +82,74 @@ function BarChart({ subiect, comps }: { subiect: { label: string; pretMp: number
   )
 }
 
-// Price gauge: shows min-max range with markers for recommended and client price
-function PriceGauge({ min, max, rec, clientPrice }: { min: number; max: number; rec: number; clientPrice?: number }) {
-  const range = Math.max(max - min, 1)
-  const padding = range * 0.2
-  const lo = min - padding
-  const hi = max + padding
-  const span = Math.max(hi - lo, 1)
-  const toPct = (v: number) => Math.max(0, Math.min(100, ((v - lo) / span) * 100))
+// Price ladder: vertical list of prices from highest to lowest with colored dots
+function PriceLadder({ min, max, rec, clientPrice, compPrices }: {
+  min: number; max: number; rec: number; clientPrice?: number; compPrices: { label: string; price: number }[]
+}) {
+  const isClientAbove = clientPrice != null && clientPrice > max
+  const isClientBelow = clientPrice != null && clientPrice < min
+  const isClientWithin = clientPrice != null && !isClientAbove && !isClientBelow
 
-  const recPct = toPct(rec)
-  const minPct = toPct(min)
-  const maxPct = toPct(max)
-  const clientPct = clientPrice != null ? toPct(clientPrice) : null
+  const entries: { label: string; price: number; dot: string; bold?: boolean }[] = []
+
+  if (clientPrice != null) {
+    entries.push({
+      label: 'Pret solicitat client',
+      price: clientPrice,
+      dot: isClientAbove ? '#ef4444' : isClientBelow ? '#f97316' : '#22c55e',
+      bold: true,
+    })
+  }
+
+  entries.push({ label: 'Pret recomandat', price: rec, dot: '#0f2557', bold: true })
+
+  compPrices.forEach(c => entries.push({ label: c.label, price: c.price, dot: '#94a3b8' }))
+
+  // Sort highest to lowest
+  entries.sort((a, b) => b.price - a.price)
 
   return (
-    <div className="pt-6 pb-2">
-      {/* Track */}
-      <div className="relative h-4 bg-slate-100 rounded-full">
-        {/* Recommended range band */}
-        <div
-          className="absolute top-0 h-full rounded-full opacity-30"
-          style={{ left: `${minPct}%`, width: `${maxPct - minPct}%`, backgroundColor: NAVY }}
-        />
-        {/* Min marker */}
-        <div className="absolute top-0 h-full w-0.5 bg-slate-400" style={{ left: `${minPct}%` }} />
-        {/* Max marker */}
-        <div className="absolute top-0 h-full w-0.5 bg-slate-400" style={{ left: `${maxPct}%` }} />
-        {/* Recommended dot */}
-        <div
-          className="absolute top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-2 border-white shadow-md -ml-2.5 z-10"
-          style={{ left: `${recPct}%`, backgroundColor: NAVY }}
-        />
-        {/* Client price dot */}
-        {clientPct != null && (
-          <div
-            className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-white shadow-md -ml-2 z-10 bg-amber-500"
-            style={{ left: `${clientPct}%` }}
-          />
-        )}
-      </div>
-      {/* Labels below */}
-      <div className="relative mt-3 h-8 text-xs text-slate-500">
-        <span className="absolute -translate-x-1/2" style={{ left: `${minPct}%` }}>{fmtEUR(min)}</span>
-        <span className="absolute -translate-x-1/2" style={{ left: `${maxPct}%` }}>{fmtEUR(max)}</span>
-        <span
-          className="absolute -translate-x-1/2 font-bold"
-          style={{ left: `${recPct}%`, color: NAVY }}
-        >{fmtEUR(rec)}</span>
-        {clientPct != null && clientPrice != null && (
-          <span className="absolute -translate-x-1/2 text-amber-600 font-semibold" style={{ left: `${clientPct}%`, top: '16px' }}>
-            {fmtEUR(clientPrice)}
-          </span>
-        )}
-      </div>
-      <div className="flex gap-4 mt-2">
-        <span className="flex items-center gap-1.5 text-xs text-slate-500">
-          <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: NAVY }} /> Pret recomandat
-        </span>
-        {clientPrice != null && (
-          <span className="flex items-center gap-1.5 text-xs text-slate-500">
-            <span className="w-3 h-3 rounded-full inline-block bg-amber-500" /> Pret solicitat client
-          </span>
-        )}
-        <span className="flex items-center gap-1.5 text-xs text-slate-500">
-          <span className="w-3 h-3 rounded-sm inline-block opacity-40" style={{ backgroundColor: NAVY }} /> Interval recomandat
-        </span>
-      </div>
+    <div className="space-y-0">
+      {entries.map((entry, i) => {
+        const diff = i < entries.length - 1 ? entry.price - entries[i + 1].price : null
+        return (
+          <div key={i}>
+            {/* Price row */}
+            <div className="flex items-center gap-3 py-2.5">
+              <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: entry.dot }} />
+              <div className="flex-1 min-w-0">
+                <span className={`text-xs ${entry.bold ? 'font-semibold text-slate-800' : 'text-slate-500'}`}>
+                  {entry.label}
+                </span>
+              </div>
+              <span className={`text-sm tabular-nums flex-shrink-0 ${entry.bold ? 'font-bold text-slate-900' : 'text-slate-600'}`}>
+                {fmtEUR(entry.price)}
+              </span>
+            </div>
+            {/* Gap between rows */}
+            {diff != null && diff > 0 && (
+              <div className="flex items-center gap-3 py-0.5">
+                <div className="w-3 flex justify-center">
+                  <div className="w-px h-4 bg-slate-200" />
+                </div>
+                <span className="text-xs text-slate-400 italic">↓ -{fmtEUR(diff)}</span>
+              </div>
+            )}
+          </div>
+        )
+      })}
+      {/* Status badge */}
+      {clientPrice != null && (
+        <div className={`mt-3 text-xs font-medium px-3 py-1.5 rounded-lg inline-block ${
+          isClientAbove ? 'bg-red-50 text-red-700' :
+          isClientBelow ? 'bg-orange-50 text-orange-700' :
+          'bg-green-50 text-green-700'
+        }`}>
+          {isClientAbove ? '⚠ Pret solicitat peste intervalul recomandat' :
+           isClientBelow ? '⚠ Pret solicitat sub intervalul recomandat' :
+           '✓ Pret solicitat in intervalul recomandat'}
+        </div>
+      )}
     </div>
   )
 }
@@ -396,15 +397,15 @@ export default function ACPClient() {
           })()}
         </div>
 
-        {/* Price gauge */}
+        {/* Price ladder */}
         <div className="bg-white rounded-2xl border border-gray-100 p-5">
-          <h3 className="font-semibold text-slate-900 mb-1 text-sm">Pozitionare pret</h3>
-          <p className="text-xs text-slate-400 mb-2">Interval recomandat vs pret solicitat</p>
-          <PriceGauge
+          <h3 className="font-semibold text-slate-900 mb-3 text-sm">Pozitionare pret</h3>
+          <PriceLadder
             min={result.pret_recomandat_min}
             max={result.pret_recomandat_max}
             rec={result.pret_recomandat}
             clientPrice={subiect.pret_solicitat}
+            compPrices={filledComps.map((c, i) => ({ label: `Comparabila ${i + 1}`, price: c.pret_cerut }))}
           />
         </div>
 
