@@ -1,11 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import path from 'path'
 import type { ACPSubiect, ACPComparabila, ACPAnalysisResult } from '@/types'
+
+// pdfkit must be imported this way in Next.js App Router
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const PDFDocument = require('pdfkit') as typeof import('pdfkit')
 
 export async function POST(request: Request) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
 
   const { subiect, comparabile, result } = await request.json() as {
     subiect: ACPSubiect
@@ -13,135 +17,194 @@ export async function POST(request: Request) {
     result: ACPAnalysisResult
   }
 
-  const fmt = (n: number) => '€' + new Intl.NumberFormat('ro-RO').format(n)
-
+  const fmt = (n: number) => '\u20AC' + new Intl.NumberFormat('ro-RO').format(n)
   const locatie = (o: { judet?: string; localitate?: string; adresa_stradala?: string }) =>
     [o.adresa_stradala, o.localitate, o.judet].filter(Boolean).join(', ')
-
-  const subiectRows = [
-    ['Tip', subiect.tip],
-    ['Judet', subiect.judet],
-    ['Localitate', subiect.localitate],
-    subiect.adresa_stradala ? ['Adresa', subiect.adresa_stradala] : null,
-    subiect.tip === 'Casa/Vila'
-      ? ['Suprafata utila', `${subiect.suprafata} mp`]
-      : ['Suprafata', `${subiect.suprafata} mp`],
-    subiect.suprafata_teren ? ['Suprafata teren', `${subiect.suprafata_teren} mp`] : null,
-    subiect.nr_camere ? ['Nr camere', String(subiect.nr_camere)] : null,
-    subiect.nr_etaje ? ['Nr etaje', `${subiect.nr_etaje}${subiect.mansarda ? ' + mansarda' : ''}`] : null,
-    subiect.mansarda && !subiect.nr_etaje ? ['Mansarda', 'Da'] : null,
-    subiect.etaj ? ['Etaj', subiect.etaj] : null,
-    subiect.an_constructie ? ['An constructie', String(subiect.an_constructie)] : null,
-    subiect.stare ? ['Stare', subiect.stare] : null,
-    subiect.deschidere_strada ? ['Deschidere la strada', `${subiect.deschidere_strada} m`] : null,
-    subiect.clasificare ? ['Clasificare', subiect.clasificare] : null,
-    subiect.utilitati?.length ? ['Utilitati', subiect.utilitati.join(', ')] : null,
-    subiect.pret_solicitat ? ['Pret solicitat client', fmt(subiect.pret_solicitat)] : null,
-  ].filter(Boolean) as [string, string][]
-
-  const compRows = comparabile.map((c, i) => {
-    const pretMp = Math.round(c.pret_cerut / c.suprafata)
-    const obs = result.observatii_comparabile[i] ?? ''
-    return `<tr>
-      <td>${locatie(c)}</td>
-      <td>${c.suprafata} mp</td>
-      <td>${c.nr_camere ?? '-'}</td>
-      <td>${c.etaj ?? '-'}</td>
-      <td>${c.stare ?? '-'}</td>
-      <td>${fmt(c.pret_cerut)}</td>
-      <td>${fmt(pretMp)}/mp</td>
-      <td style="font-size:12px;color:#64748b">${obs}</td>
-    </tr>`
-  }).join('')
+  const dateRo = new Date().toLocaleDateString('ro-RO', { day: '2-digit', month: 'long', year: 'numeric' })
 
   const avgPretMp = Math.round(
     comparabile.reduce((s, c) => s + c.pret_cerut / c.suprafata, 0) / comparabile.length
   )
 
-  const html = `<!DOCTYPE html>
-<html lang="ro">
-<head>
-  <meta charset="UTF-8">
-  <title>ACP — ${subiect.localitate}, ${subiect.judet}</title>
-  <style>
-    body{font-family:Arial,sans-serif;max-width:960px;margin:0 auto;padding:40px 20px;color:#1e293b}
-    h1{color:#0f2557;border-bottom:3px solid #0f2557;padding-bottom:10px;margin-bottom:4px}
-    h2{color:#334155;margin-top:28px;margin-bottom:10px;font-size:16px}
-    .meta{color:#64748b;font-size:13px;margin-bottom:24px}
-    .subiect-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
-    .s-item{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px}
-    .s-label{font-size:11px;color:#94a3b8;margin-bottom:3px}
-    .s-val{font-size:14px;font-weight:600;color:#1e293b}
-    .report-header{display:flex;align-items:center;justify-content:space-between;padding-bottom:14px;margin-bottom:24px;border-bottom:3px solid #0f2557}
-    .report-header .logo-wrap{display:flex;align-items:center;gap:10px}
-    .report-header .logo-wrap img{height:52px;width:auto}
-    .report-header .logo-text .name{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#0f2557}
-    .report-header .logo-text .sub{font-size:11px;color:#94a3b8}
-    .report-header .title-center{text-align:center}
-    .report-header .title-center .main{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#0f2557}
-    .report-header .title-center .sub{font-size:11px;color:#64748b;margin-top:2px}
-    .report-header .date-right{text-align:right}
-    .report-header .date-right .label{font-size:11px;color:#94a3b8}
-    .report-header .date-right .val{font-size:13px;font-weight:600;color:#1e293b}
-    .price-box{background:#0f2557;color:#fff;border-radius:12px;padding:28px;margin:20px 0}
-    .main-price{font-size:40px;font-weight:700;margin:8px 0}
-    table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
-    th{background:#f1f5f9;padding:9px 10px;text-align:left;font-size:12px;color:#475569}
-    td{padding:9px 10px;border-bottom:1px solid #e2e8f0}
-    .analiza{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:18px;line-height:1.7;font-size:14px;white-space:pre-line}
-    .footer{margin-top:40px;padding-top:16px;border-top:1px solid #e2e8f0;text-align:center;color:#94a3b8;font-size:11px}
-    @media print{body{padding:20px}}
-  </style>
-</head>
-<body>
-  <div class="report-header">
-    <div class="logo-wrap">
-      <img src="/logo-hcp.png" alt="HCP" style="height:52px;width:auto">
-    </div>
-    <div class="title-center">
-      <div class="main">Analiza Comparativa de Piata</div>
-      <div class="sub">${subiect.tip} &bull; ${locatie(subiect)}</div>
-    </div>
-    <div class="date-right">
-      <div class="label">Data raportului</div>
-      <div class="val">${new Date().toLocaleDateString('ro-RO', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
-    </div>
-  </div>
+  const NAVY  = '#0f2557'
+  const LIGHT = '#f1f5f9'
+  const GRAY  = '#64748b'
+  const BLACK = '#1e293b'
 
-  <h2>Proprietatea subiect</h2>
-  <div class="subiect-grid">
-    ${subiectRows.map(([l, v]) => `<div class="s-item"><div class="s-label">${l}</div><div class="s-val">${v}</div></div>`).join('')}
-  </div>
+  // Collect PDF bytes into a buffer
+  const chunks: Buffer[] = []
+  await new Promise<void>((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 50, size: 'A4' })
+    doc.on('data', (chunk: Buffer) => chunks.push(chunk))
+    doc.on('end', resolve)
+    doc.on('error', reject)
 
-  <div class="price-box">
-    <div style="font-size:13px;opacity:.8">Pret recomandat</div>
-    <div class="main-price">${fmt(result.pret_recomandat)}</div>
-    <div style="font-size:15px;opacity:.85;margin-top:4px">Interval: ${fmt(result.pret_recomandat_min)} — ${fmt(result.pret_recomandat_max)}</div>
-    <div style="margin-top:12px;font-size:14px;opacity:.8">Pret mediu/mp comparabile: ${fmt(avgPretMp)}/mp</div>
-  </div>
+    const W = doc.page.width   // 595
+    const L = 50               // left margin
+    const R = W - 50           // right margin
+    const CW = R - L           // content width
 
-  <h2>Analiza</h2>
-  <div class="analiza">${result.analiza}</div>
+    // ── HEADER ────────────────────────────────────────────────────────────────
+    const logoPath = path.join(process.cwd(), 'public', 'logo-hcp.png')
+    try {
+      doc.image(logoPath, L, 40, { height: 40 })
+    } catch {
+      // logo missing — skip silently
+    }
 
-  <h2>Comparabile (${comparabile.length})</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Adresa / Zona</th><th>Suprafata</th><th>Camere</th><th>Etaj</th>
-        <th>Stare</th><th>Pret cerut</th><th>€/mp</th><th>Observatii</th>
-      </tr>
-    </thead>
-    <tbody>${compRows}</tbody>
-  </table>
+    // Title block (right-aligned)
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY)
+      .text('ANALIZA COMPARATIVA DE PIATA', L, 42, { align: 'right' })
+    doc.font('Helvetica').fontSize(9).fillColor(GRAY)
+      .text(`${subiect.tip} \u2022 ${locatie(subiect)}`, L, 57, { align: 'right' })
+    doc.font('Helvetica').fontSize(8).fillColor(GRAY)
+      .text(dateRo, L, 70, { align: 'right' })
 
-  <div class="footer">Raport generat de platforma HCP Imobiliare &bull; Date cu caracter informativ</div>
-</body>
-</html>`
+    // Navy divider
+    doc.moveDown(0.5)
+    const divY = 88
+    doc.rect(L, divY, CW, 2).fill(NAVY)
+    doc.moveDown(1)
 
-  return new Response(html, {
+    // ── PROPRIETATEA SUBIECT ──────────────────────────────────────────────────
+    let y = divY + 14
+    doc.font('Helvetica-Bold').fontSize(10).fillColor(NAVY)
+      .text('Proprietatea subiect', L, y)
+    y += 18
+
+    const subiectRows: [string, string][] = [
+      ['Tip', subiect.tip],
+      ['Judet', subiect.judet],
+      ['Localitate', subiect.localitate],
+      ...(subiect.adresa_stradala ? [['Adresa', subiect.adresa_stradala] as [string, string]] : []),
+      [subiect.tip === 'Casa/Vila' ? 'Suprafata utila' : 'Suprafata', `${subiect.suprafata} mp`],
+      ...(subiect.suprafata_teren ? [['Suprafata teren', `${subiect.suprafata_teren} mp`] as [string, string]] : []),
+      ...(subiect.nr_camere ? [['Nr camere', String(subiect.nr_camere)] as [string, string]] : []),
+      ...(subiect.nr_etaje ? [['Nr etaje', `${subiect.nr_etaje}${subiect.mansarda ? ' + mansarda' : ''}`] as [string, string]] : []),
+      ...(subiect.mansarda && !subiect.nr_etaje ? [['Mansarda', 'Da'] as [string, string]] : []),
+      ...(subiect.etaj ? [['Etaj', subiect.etaj] as [string, string]] : []),
+      ...(subiect.an_constructie ? [['An constructie', String(subiect.an_constructie)] as [string, string]] : []),
+      ...(subiect.stare ? [['Stare', subiect.stare] as [string, string]] : []),
+      ...(subiect.deschidere_strada ? [['Deschidere la strada', `${subiect.deschidere_strada} m`] as [string, string]] : []),
+      ...(subiect.clasificare ? [['Clasificare', subiect.clasificare] as [string, string]] : []),
+      ...(subiect.utilitati?.length ? [['Utilitati', subiect.utilitati.join(', ')] as [string, string]] : []),
+      ...(subiect.pret_solicitat ? [['Pret solicitat client', fmt(subiect.pret_solicitat)] as [string, string]] : []),
+    ]
+
+    // Render as 3-column grid of small cards
+    const cardW = (CW - 8) / 3
+    const cardH = 36
+    const cols = 3
+    subiectRows.forEach(([label, value], idx) => {
+      const col = idx % cols
+      const row = Math.floor(idx / cols)
+      const cx = L + col * (cardW + 4)
+      const cy = y + row * (cardH + 4)
+      doc.rect(cx, cy, cardW, cardH).fill(LIGHT)
+      doc.font('Helvetica').fontSize(7).fillColor(GRAY)
+        .text(label, cx + 6, cy + 6, { width: cardW - 12 })
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(BLACK)
+        .text(value, cx + 6, cy + 17, { width: cardW - 12 })
+    })
+    y += Math.ceil(subiectRows.length / cols) * (cardH + 4) + 10
+
+    // ── PRICE BOX ─────────────────────────────────────────────────────────────
+    const boxH = subiect.pret_solicitat ? 80 : 68
+    doc.rect(L, y, CW, boxH).fill(NAVY)
+
+    doc.font('Helvetica').fontSize(9).fillColor('#93c5fd')
+      .text('Pret recomandat', L + 16, y + 10)
+    doc.font('Helvetica-Bold').fontSize(26).fillColor('#ffffff')
+      .text(fmt(result.pret_recomandat), L + 16, y + 22)
+    doc.font('Helvetica').fontSize(9).fillColor('#bfdbfe')
+      .text(`Interval: ${fmt(result.pret_recomandat_min)} \u2014 ${fmt(result.pret_recomandat_max)}`, L + 16, y + 52)
+    if (subiect.pret_solicitat) {
+      const isAbove = subiect.pret_solicitat > result.pret_recomandat_max
+      const isBelow = subiect.pret_solicitat < result.pret_recomandat_min
+      const statusText = isAbove ? 'peste intervalul recomandat' : isBelow ? 'sub intervalul recomandat' : 'in intervalul recomandat'
+      doc.font('Helvetica').fontSize(8).fillColor('#fde68a')
+        .text(`Pret solicitat client: ${fmt(subiect.pret_solicitat)} \u2014 ${statusText}`, L + 16, y + 65)
+    }
+    doc.font('Helvetica').fontSize(8).fillColor('#93c5fd')
+      .text(`Pret mediu/mp comparabile: ${fmt(avgPretMp)}/mp`, R - 160, y + 10, { width: 150, align: 'right' })
+    y += boxH + 14
+
+    // ── COMPARATII PRETURI ────────────────────────────────────────────────────
+    doc.font('Helvetica-Bold').fontSize(10).fillColor(NAVY)
+      .text('Comparatie preturi', L, y)
+    y += 14
+
+    // Header row
+    doc.rect(L, y, CW, 16).fill(LIGHT)
+    doc.font('Helvetica-Bold').fontSize(8).fillColor(GRAY)
+    const colWidths = [130, 70, 50, 50, 80, 80, CW - 460]
+    const colHeaders = ['Adresa / Zona', 'Suprafata', 'Camere', 'Etaj', 'Pret cerut', '\u20AC/mp', 'Observatii AI']
+    let cx = L + 4
+    colHeaders.forEach((h, i) => {
+      doc.text(h, cx, y + 4, { width: colWidths[i] })
+      cx += colWidths[i]
+    })
+    y += 16
+
+    // Comp rows
+    comparabile.forEach((c, i) => {
+      const pretMp = Math.round(c.pret_cerut / c.suprafata)
+      const obs = result.observatii_comparabile[i] ?? ''
+      const rowH = obs.length > 60 ? 32 : 20
+      if (i % 2 === 0) doc.rect(L, y, CW, rowH).fill('#f8fafc')
+
+      const vals = [
+        locatie(c),
+        `${c.suprafata} mp`,
+        c.nr_camere ? String(c.nr_camere) : '-',
+        c.etaj || '-',
+        fmt(c.pret_cerut),
+        `${fmt(pretMp)}/mp`,
+        obs,
+      ]
+      cx = L + 4
+      doc.font('Helvetica').fontSize(8).fillColor(BLACK)
+      vals.forEach((v, j) => {
+        doc.text(v, cx, y + 5, { width: colWidths[j] - 4, ellipsis: true })
+        cx += colWidths[j]
+      })
+      y += rowH
+    })
+
+    // Bottom border
+    doc.moveTo(L, y).lineTo(R, y).strokeColor('#e2e8f0').lineWidth(0.5).stroke()
+    y += 14
+
+    // ── ANALIZA ───────────────────────────────────────────────────────────────
+    // Add new page if not enough space
+    if (y > 650) { doc.addPage(); y = 50 }
+
+    doc.font('Helvetica-Bold').fontSize(10).fillColor(NAVY).text('Analiza', L, y)
+    y += 14
+    doc.font('Helvetica').fontSize(9).fillColor(BLACK)
+      .text(result.analiza, L, y, { width: CW, lineGap: 2 })
+
+    // ── FOOTER ────────────────────────────────────────────────────────────────
+    const pageCount = doc.bufferedPageRange ? doc.bufferedPageRange().count : 1
+    for (let p = 0; p < pageCount; p++) {
+      if (p > 0) doc.switchToPage(p)
+      doc.font('Helvetica').fontSize(8).fillColor('#94a3b8')
+        .text(
+          'Raport generat de platforma HCP Imobiliare \u2022 Date cu caracter informativ',
+          L, doc.page.height - 35, { width: CW, align: 'center' }
+        )
+    }
+
+    doc.end()
+  })
+
+  const pdfBuffer = Buffer.concat(chunks)
+  const filename = `ACP-${(subiect.localitate || subiect.judet).replace(/\s+/g, '-')}-${Date.now()}.pdf`
+
+  return new Response(pdfBuffer, {
     headers: {
-      'Content-Type': 'text/html; charset=utf-8',
-      'Content-Disposition': `attachment; filename="ACP-${(subiect.localitate || subiect.judet).replace(/\s+/g, '-')}-${Date.now()}.html"`,
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${filename}"`,
     },
   })
 }
