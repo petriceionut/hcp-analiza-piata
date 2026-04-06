@@ -157,6 +157,9 @@ export interface ACPSubiect {
   judet: string
   localitate: string
   adresa_stradala?: string
+  // Internal only — not shown in report or PDF
+  nume_proprietar?: string
+  telefon_proprietar?: string
   // common
   suprafata: number
   an_constructie?: number
@@ -182,11 +185,13 @@ export interface ACPComparabila {
   localitate: string
   adresa_stradala?: string
   suprafata: number
+  suprafata_teren?: number
   nr_camere?: number
   etaj?: string
   stare?: ACPStare
   pret_cerut: number             // EUR
   link_anunt?: string
+  utilitati?: string[]
 }
 
 export interface ACPAnalysisResult {

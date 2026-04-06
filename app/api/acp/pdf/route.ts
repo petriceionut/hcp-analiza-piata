@@ -96,11 +96,7 @@ export async function POST(request: Request) {
 <body>
   <div class="report-header">
     <div class="logo-wrap">
-      <img src="/logo-hcp.png" alt="HCP" onerror="this.style.display='none'">
-      <div class="logo-text">
-        <div class="name">Home Capital Partners</div>
-        <div class="sub">Servicii Imobiliare</div>
-      </div>
+      <img src="/logo-hcp.png" alt="HCP" style="height:52px;width:auto">
     </div>
     <div class="title-center">
       <div class="main">Analiza Comparativa de Piata</div>

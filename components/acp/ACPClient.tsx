@@ -155,12 +155,13 @@ function PriceGauge({ min, max, rec, clientPrice }: { min: number; max: number; 
 
 const emptyComp = (): ACPComparabila => ({
   judet: '', localitate: '', adresa_stradala: '',
-  suprafata: 0, nr_camere: undefined, etaj: '',
-  stare: 'Stare buna', pret_cerut: 0, link_anunt: '',
+  suprafata: 0, suprafata_teren: undefined, nr_camere: undefined, etaj: '',
+  stare: 'Stare buna', pret_cerut: 0, link_anunt: '', utilitati: [],
 })
 
 const defaultSubiect = (): ACPSubiect => ({
   tip: 'Apartament', judet: '', localitate: '', adresa_stradala: '',
+  nume_proprietar: '', telefon_proprietar: '',
   suprafata: 0, stare: 'Stare buna',
 })
 
@@ -183,6 +184,11 @@ export default function ACPClient() {
   const toggleUtilitate = (item: string) => {
     const cur = subiect.utilitati ?? []
     updS('utilitati', cur.includes(item) ? cur.filter(u => u !== item) : [...cur, item])
+  }
+
+  const toggleCompUtilitate = (i: number, item: string) => {
+    const cur = comparabile[i].utilitati ?? []
+    updC(i, 'utilitati', cur.includes(item) ? cur.filter(u => u !== item) : [...cur, item])
   }
 
   const setTip = (tip: ACPTip) => {
@@ -208,6 +214,8 @@ export default function ACPClient() {
     setExpanded(p => p.map((v, idx) => idx === i ? !v : v))
 
   const validateStep1 = () => {
+    if (!subiect.nume_proprietar?.trim()) { toast.error('Completati numele proprietarului'); return false }
+    if (!subiect.telefon_proprietar?.trim()) { toast.error('Completati telefonul proprietarului'); return false }
     if (!subiect.judet) { toast.error('Selectati judetul'); return false }
     if (!subiect.localitate.trim()) { toast.error('Completati localitatea'); return false }
     if (!subiect.suprafata || subiect.suprafata <= 0) { toast.error('Completati suprafata'); return false }
@@ -239,12 +247,15 @@ export default function ACPClient() {
     const filled = comparabile.filter((c, i) =>
       i === 0 || (c.judet && c.localitate.trim() && c.suprafata > 0 && c.pret_cerut > 0)
     )
+    // Strip internal-only fields before sending to AI
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { nume_proprietar, telefon_proprietar, ...subiectForAPI } = subiect
     setLoading(true)
     try {
       const res = await fetch('/api/acp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subiect, comparabile: filled }),
+        body: JSON.stringify({ subiect: subiectForAPI, comparabile: filled }),
       })
       if (!res.ok) throw new Error()
       setResult(await res.json())
@@ -311,7 +322,7 @@ export default function ACPClient() {
             {/* Logo left */}
             <div className="flex-shrink-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo-hcp.png" alt="Home Capital Partners" style={{ height: 50, width: 'auto' }} />
+              <img src="/logo-hcp.png" alt="HCP" style={{ height: '50px' }} />
             </div>
             {/* Title center */}
             <div className="text-center">
@@ -350,16 +361,53 @@ export default function ACPClient() {
 
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Bar chart */}
+          {/* Bar chart — inline HTML/CSS */}
           <div className="bg-white rounded-2xl border border-gray-100 p-5">
             <h3 className="font-semibold text-slate-900 mb-4 text-sm">Comparatie €/mp</h3>
-            <BarChart
-              subiect={{ label: locatieScurta(subiect) || 'Subiect', pretMp: subiectPretMp }}
-              comps={filledComps.map(c => ({
-                label: locatieScurta(c),
-                pretMp: Math.round(c.pret_cerut / c.suprafata),
-              }))}
-            />
+            {(() => {
+              const rows = [
+                { label: locatieScurta(subiect) || 'Subiect', pretMp: subiectPretMp, isSubiect: true },
+                ...filledComps.map(c => ({
+                  label: locatieScurta(c),
+                  pretMp: Math.round(c.pret_cerut / c.suprafata),
+                  isSubiect: false,
+                })),
+              ]
+              const maxVal = Math.max(...rows.map(r => r.pretMp).filter(v => v > 0 && isFinite(v)), 1)
+              return (
+                <div>
+                  {rows.map((row, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', margin: '8px 0' }}>
+                      <div style={{ width: '120px', fontSize: '12px', textAlign: 'right', paddingRight: '8px', color: '#64748b', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {row.label}
+                      </div>
+                      <div style={{
+                        background: row.isSubiect ? '#0f2557' : '#4a90d9',
+                        height: '24px',
+                        width: `${Math.max((row.pretMp / maxVal) * 80, 2)}%`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: '0 8px',
+                        color: 'white',
+                        fontSize: '12px',
+                        borderRadius: '4px',
+                        minWidth: '48px',
+                      }}>
+                        {row.pretMp > 0 ? `${fmtEUR(row.pretMp)}/mp` : ''}
+                      </div>
+                    </div>
+                  ))}
+                  <div style={{ display: 'flex', gap: '16px', marginTop: '8px', paddingLeft: '128px' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#94a3b8' }}>
+                      <span style={{ width: 12, height: 12, background: '#0f2557', display: 'inline-block', borderRadius: 2 }} />{' '}Subiect
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#94a3b8' }}>
+                      <span style={{ width: 12, height: 12, background: '#4a90d9', display: 'inline-block', borderRadius: 2 }} />{' '}Comparabile
+                    </span>
+                  </div>
+                </div>
+              )
+            })()}
           </div>
           {/* Gauge */}
           <div className="bg-white rounded-2xl border border-gray-100 p-5">
@@ -472,6 +520,18 @@ export default function ACPClient() {
                 <span className="text-xs font-semibold text-center leading-tight">{label}</span>
               </button>
             ))}
+          </div>
+
+          {/* Owner info — internal use only, not shown in report */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5 p-4 bg-slate-50 rounded-xl border border-slate-100">
+            <div>
+              <label className="label">Nume proprietar *</label>
+              <input value={subiect.nume_proprietar || ''} onChange={e => updS('nume_proprietar', e.target.value)} className="input-field" placeholder="ex: Ion Popescu" />
+            </div>
+            <div>
+              <label className="label">Telefon proprietar *</label>
+              <input value={subiect.telefon_proprietar || ''} onChange={e => updS('telefon_proprietar', e.target.value)} className="input-field" placeholder="ex: 07xx xxx xxx" />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -734,10 +794,29 @@ export default function ACPClient() {
                             </select>
                           </div>
                         )}
+                        {subiect.tip === 'Casa/Vila' && (
+                          <div>
+                            <label className="label">Suprafata teren (mp)</label>
+                            <input type="number" value={c.suprafata_teren || ''} onChange={e => updC(i, 'suprafata_teren', e.target.value ? Number(e.target.value) : undefined)} className="input-field" placeholder="ex: 400" min={1} />
+                          </div>
+                        )}
                         <div>
                           <label className="label">Pret cerut (€) {i === 0 ? '*' : ''}</label>
                           <input type="number" value={c.pret_cerut || ''} onChange={e => updC(i, 'pret_cerut', Number(e.target.value))} className="input-field" placeholder="ex: 85000" min={1} />
                         </div>
+                        {(subiect.tip === 'Casa/Vila' || subiect.tip === 'Teren') && (
+                          <div className="col-span-2 sm:col-span-3">
+                            <label className="label">Utilitati disponibile</label>
+                            <div className="flex flex-wrap gap-3 mt-1">
+                              {(subiect.tip === 'Casa/Vila' ? UTILITATI_CASA : UTILITATI_TEREN).map(u => (
+                                <label key={u} className="flex items-center gap-2 cursor-pointer">
+                                  <input type="checkbox" checked={(c.utilitati ?? []).includes(u)} onChange={() => toggleCompUtilitate(i, u)} className="w-4 h-4 rounded border-slate-300 text-blue-900 focus:ring-blue-800" />
+                                  <span className="text-sm text-slate-700">{u}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         <div className="col-span-2 sm:col-span-3">
                           <label className="label">Link anunt <span className="text-slate-400 font-normal">— optional, doar referinta</span></label>
                           <input value={c.link_anunt || ''} onChange={e => updC(i, 'link_anunt', e.target.value)} className="input-field" placeholder="https://..." />
