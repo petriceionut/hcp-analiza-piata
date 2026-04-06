@@ -14,12 +14,12 @@ export interface NewsArticle {
 }
 
 const FEEDS: { url: string; source: string }[] = [
-  { url: 'https://feeds.feedburner.com/profit-imobiliare', source: 'Profit.ro' },
-  { url: 'https://www.capital.ro/feed/', source: 'Capital.ro' },
-  { url: 'https://www.economica.net/feed/', source: 'Economica.net' },
-  { url: 'https://www.wall-street.ro/rss.xml', source: 'Wall-Street.ro' },
-  { url: 'https://www.hotnews.ro/rss/', source: 'HotNews.ro' },
-  { url: 'https://www.digi24.ro/rss.xml', source: 'Digi24' },
+  { url: 'https://www.imobiliare.ro/stiri/rss', source: 'Imobiliare.ro' },
+  { url: 'https://www.proprietati.ro/stiri/rss', source: 'Proprietati.ro' },
+  { url: 'https://www.spatiicomerciale.ro/stiri/rss', source: 'SpatiiComerciale.ro' },
+  { url: 'https://www.newimobiliare.ro/feed', source: 'NewImobiliare.ro' },
+  { url: 'https://www.imobiliare365.ro/feed', source: 'Imobiliare365.ro' },
+  { url: 'https://www.ziare.com/imobiliare/rss', source: 'Ziare.com' },
 ]
 
 const parser = new XMLParser({
@@ -69,17 +69,6 @@ function extractImage(item: Record<string, unknown>): string {
   return ''
 }
 
-const EXCLUDE_KEYWORDS = [
-  'nato', 'militar', 'apărare', 'aparare', 'diplomat', 'ministrul de externe',
-  'război', 'razboi', 'conflict armat', 'rusia', 'ucraina', 'sua ', 'trump',
-  'zelenski', 'alegeri', 'partid', 'parlament', 'guvern', 'ministru',
-  'premier', 'presedinte', 'președinte', 'coalitie', 'coaliție',
-]
-
-function isNotExcluded(title: string, desc: string): boolean {
-  const combined = (title + ' ' + desc).toLowerCase()
-  return !EXCLUDE_KEYWORDS.some(kw => combined.includes(kw))
-}
 
 async function fetchFeed(feed: { url: string; source: string }): Promise<NewsArticle[]> {
   const controller = new AbortController()
@@ -91,10 +80,7 @@ async function fetchFeed(feed: { url: string; source: string }): Promise<NewsArt
       next: { revalidate: 900 },
     })
     clearTimeout(tid)
-    if (!res.ok) {
-      console.error(`[news] ${feed.url} → HTTP ${res.status} ${res.statusText}`)
-      return []
-    }
+    if (!res.ok) return []
     const xml = await res.text()
     const parsed = parser.parse(xml)
 
@@ -126,7 +112,6 @@ async function fetchFeed(feed: { url: string; source: string }): Promise<NewsArt
       const timestamp = pubDateStr ? new Date(pubDateStr).getTime() : 0
 
       if (!title || !link) continue
-      if (!isNotExcluded(title, description)) continue
 
       articles.push({
         title: title.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>'),
@@ -139,10 +124,8 @@ async function fetchFeed(feed: { url: string; source: string }): Promise<NewsArt
       })
     }
     return articles
-  } catch (err) {
+  } catch {
     clearTimeout(tid)
-    const msg = err instanceof Error ? err.message : String(err)
-    console.error(`[news] ${feed.url} → ${msg}`)
     return []
   }
 }
@@ -150,12 +133,8 @@ async function fetchFeed(feed: { url: string; source: string }): Promise<NewsArt
 export async function fetchNews(max = 15): Promise<NewsArticle[]> {
   const results = await Promise.allSettled(FEEDS.map(fetchFeed))
   const all: NewsArticle[] = []
-  for (let i = 0; i < results.length; i++) {
-    const r = results[i]
-    if (r.status === 'fulfilled') {
-      console.log(`[news] ${FEEDS[i].url} → ${r.value.length} articles`)
-      all.push(...r.value)
-    }
+  for (const r of results) {
+    if (r.status === 'fulfilled') all.push(...r.value)
   }
   // Sort by date descending, deduplicate by link
   const seen = new Set<string>()
