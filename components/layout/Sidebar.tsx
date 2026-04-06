@@ -12,7 +12,6 @@ import {
   Home,
   LayoutDashboard,
   LogOut,
-  Newspaper,
   ScanLine,
   TrendingUp,
   ChevronLeft,
@@ -51,11 +50,6 @@ const navItems = [
     href: '/scanner',
     icon: ScanLine,
     label: 'Scanner',
-  },
-  {
-    href: '/stiri',
-    icon: Newspaper,
-    label: 'Știri',
   },
   {
     href: '/acp',
