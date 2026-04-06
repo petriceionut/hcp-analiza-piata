@@ -36,7 +36,7 @@ const TIP_CARDS: { tip: ACPTip; icon: React.ElementType; label: string }[] = [
   { tip: 'Spatiu Comercial', icon: Store,   label: 'Spatiu Comercial' },
 ]
 
-const UTILITATI_CASA = ['Gaz', 'Curent', 'Apa/Canalizare', 'Fosa septica', 'Internet']
+const UTILITATI_CASA = ['Gaz', 'Curent', 'Apa/Canalizare', 'Fosa septica', 'Put', 'Internet']
 const UTILITATI_TEREN = ['Gaz', 'Curent', 'Apa', 'Canalizare']
 
 function fmtEUR(n: number) {
@@ -48,29 +48,29 @@ const NAVY = '#0f2557'
 // Horizontal bar chart: subject vs comparables by €/mp
 function BarChart({ subiect, comps }: { subiect: { label: string; pretMp: number }; comps: { label: string; pretMp: number }[] }) {
   const all = [subiect, ...comps]
-  const max = Math.max(...all.map(x => x.pretMp)) * 1.15
+  const validMps = all.map(x => x.pretMp).filter(v => v > 0 && isFinite(v))
+  const max = validMps.length > 0 ? Math.max(...validMps) * 1.15 : 1
   return (
     <div className="space-y-2.5">
       {all.map((item, i) => {
         const isSubiect = i === 0
-        const pct = Math.round((item.pretMp / max) * 100)
+        const pct = item.pretMp > 0 && max > 0 ? Math.round((item.pretMp / max) * 100) : 0
         return (
-          <div key={i} className="flex items-center gap-3">
-            <div className="w-32 text-xs text-slate-600 text-right truncate shrink-0">{item.label}</div>
-            <div className="flex-1 bg-slate-100 rounded-full h-6 overflow-hidden">
+          <div key={i} className="flex items-center gap-2">
+            <div className="w-28 text-xs text-slate-600 text-right truncate shrink-0">{item.label}</div>
+            <div className="flex-1 bg-slate-100 rounded-full h-5 overflow-hidden min-w-0">
               <div
-                className="h-full rounded-full flex items-center justify-end pr-2 transition-all duration-500"
-                style={{ width: `${pct}%`, backgroundColor: isSubiect ? NAVY : '#4a90d9' }}
-              >
-                <span className={`text-xs font-semibold ${isSubiect ? 'text-white' : 'text-white'}`}>
-                  {fmtEUR(item.pretMp)}
-                </span>
-              </div>
+                className="h-full rounded-full transition-all duration-500"
+                style={{ width: `${Math.max(pct, 2)}%`, backgroundColor: isSubiect ? NAVY : '#4a90d9' }}
+              />
+            </div>
+            <div className="w-20 text-xs font-semibold shrink-0" style={{ color: isSubiect ? NAVY : '#2563eb' }}>
+              {item.pretMp > 0 ? fmtEUR(item.pretMp) : '—'}/mp
             </div>
           </div>
         )
       })}
-      <div className="flex gap-4 mt-1 pl-36">
+      <div className="flex gap-4 mt-1 pl-30">
         <span className="flex items-center gap-1.5 text-xs text-slate-500">
           <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: NAVY }} /> Proprietatea subiect
         </span>
@@ -84,11 +84,11 @@ function BarChart({ subiect, comps }: { subiect: { label: string; pretMp: number
 
 // Price gauge: shows min-max range with markers for recommended and client price
 function PriceGauge({ min, max, rec, clientPrice }: { min: number; max: number; rec: number; clientPrice?: number }) {
-  const range = max - min
+  const range = Math.max(max - min, 1)
   const padding = range * 0.2
   const lo = min - padding
   const hi = max + padding
-  const span = hi - lo
+  const span = Math.max(hi - lo, 1)
   const toPct = (v: number) => Math.max(0, Math.min(100, ((v - lo) / span) * 100))
 
   const recPct = toPct(rec)
