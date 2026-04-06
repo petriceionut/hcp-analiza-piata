@@ -7,6 +7,7 @@ import {
   Building2, Home, Landmark, Store, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { createClient } from '@/lib/supabase/client'
 
 const STARI: ACPStare[] = ['Renovata', 'Stare buna', 'Necesita renovare']
 
@@ -243,6 +244,33 @@ export default function ACPClient() {
     return true
   }
 
+  const saveReport = async (analysis: ACPAnalysisResult, filled: ACPComparabila[]) => {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const avgPretMp = Math.round(
+      filled.reduce((s, c) => s + c.pret_cerut / c.suprafata, 0) / filled.length
+    )
+    // Strip internal-only fields from result_json
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { nume_proprietar, telefon_proprietar, ...subiectForJson } = subiect
+    await supabase.from('acp_rapoarte').insert({
+      agent_id: user.id,
+      nume_proprietar: subiect.nume_proprietar || null,
+      telefon_proprietar: subiect.telefon_proprietar || null,
+      tip_proprietate: subiect.tip,
+      judet: subiect.judet,
+      localitate: subiect.localitate,
+      adresa: subiect.adresa_stradala || null,
+      pret_recomandat: analysis.pret_recomandat,
+      pret_solicitat: subiect.pret_solicitat || null,
+      interval_min: analysis.pret_recomandat_min,
+      interval_max: analysis.pret_recomandat_max,
+      pret_mediu_mp: avgPretMp,
+      result_json: { subiect: subiectForJson, comparabile: filled, result: analysis },
+    })
+  }
+
   const generate = async () => {
     if (!validateStep2()) return
     // Only send filled comparabile
@@ -260,8 +288,11 @@ export default function ACPClient() {
         body: JSON.stringify({ subiect: subiectForAPI, comparabile: filled }),
       })
       if (!res.ok) throw new Error()
-      setResult(await res.json())
+      const data: ACPAnalysisResult = await res.json()
+      setResult(data)
       toast.success('Analiza generata!')
+      // Save silently — don't block UI or show errors
+      saveReport(data, filled).catch(() => {})
     } catch {
       toast.error('Eroare la generarea analizei')
     } finally {

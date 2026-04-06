@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { FileText, Home, TrendingUp, ArrowRight, Plus } from 'lucide-react'
+import ACPSearch from '@/components/acp/ACPSearch'
 
 export default async function DashboardPage() {
   const supabase = createClient()
@@ -122,8 +123,11 @@ export default async function DashboardPage() {
         })}
       </div>
 
+      {/* ACP report search */}
+      <ACPSearch />
+
       {/* Quick actions */}
-      <div className="mt-8 bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+      <div className="mt-6 bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
         <h3 className="text-sm font-semibold text-slate-700 mb-4">Actiuni rapide</h3>
         <div className="flex flex-wrap gap-3">
           <Link
