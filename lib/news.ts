@@ -14,15 +14,12 @@ export interface NewsArticle {
 }
 
 const FEEDS: { url: string; source: string }[] = [
-  { url: 'https://www.imobiliare.ro/stiri/rss', source: 'Imobiliare.ro' },
-  { url: 'https://www.ziarul.ro/rss/imobiliare.xml', source: 'Ziarul.ro' },
-  { url: 'https://www.economica.net/rss/imobiliare', source: 'Economica.net' },
-  { url: 'https://www.profit.ro/rss/imobiliare.rss', source: 'Profit.ro' },
-  { url: 'https://www.capital.ro/rss/imobiliare', source: 'Capital.ro' },
-  { url: 'https://www.wall-street.ro/rss/imobiliare', source: 'Wall-Street.ro' },
-  { url: 'https://www.avocatnet.ro/rss/imobiliare', source: 'Avocatnet.ro' },
-  { url: 'https://www.bankingnews.ro/rss.xml', source: 'BankingNews.ro' },
-  { url: 'https://www.curs-valutar.com/rss', source: 'Curs-Valutar.com' },
+  { url: 'https://feeds.feedburner.com/profit-imobiliare', source: 'Profit.ro' },
+  { url: 'https://www.capital.ro/feed/', source: 'Capital.ro' },
+  { url: 'https://www.economica.net/feed/', source: 'Economica.net' },
+  { url: 'https://www.wall-street.ro/rss.xml', source: 'Wall-Street.ro' },
+  { url: 'https://www.hotnews.ro/rss/', source: 'HotNews.ro' },
+  { url: 'https://www.digi24.ro/rss.xml', source: 'Digi24' },
 ]
 
 const parser = new XMLParser({
@@ -94,7 +91,10 @@ async function fetchFeed(feed: { url: string; source: string }): Promise<NewsArt
       next: { revalidate: 900 },
     })
     clearTimeout(tid)
-    if (!res.ok) return []
+    if (!res.ok) {
+      console.error(`[news] ${feed.url} → HTTP ${res.status} ${res.statusText}`)
+      return []
+    }
     const xml = await res.text()
     const parsed = parser.parse(xml)
 
@@ -139,8 +139,10 @@ async function fetchFeed(feed: { url: string; source: string }): Promise<NewsArt
       })
     }
     return articles
-  } catch {
+  } catch (err) {
     clearTimeout(tid)
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error(`[news] ${feed.url} → ${msg}`)
     return []
   }
 }
@@ -148,8 +150,12 @@ async function fetchFeed(feed: { url: string; source: string }): Promise<NewsArt
 export async function fetchNews(max = 15): Promise<NewsArticle[]> {
   const results = await Promise.allSettled(FEEDS.map(fetchFeed))
   const all: NewsArticle[] = []
-  for (const r of results) {
-    if (r.status === 'fulfilled') all.push(...r.value)
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i]
+    if (r.status === 'fulfilled') {
+      console.log(`[news] ${FEEDS[i].url} → ${r.value.length} articles`)
+      all.push(...r.value)
+    }
   }
   // Sort by date descending, deduplicate by link
   const seen = new Set<string>()
