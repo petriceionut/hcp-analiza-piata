@@ -35,7 +35,8 @@ export async function POST(request: Request) {
       ? `Suprafata utila: ${subiect.suprafata} mp${subiect.suprafata_teren ? `, teren: ${subiect.suprafata_teren} mp` : ''}`
       : `Suprafata: ${subiect.suprafata} mp`,
     subiect.nr_camere ? `Nr camere: ${subiect.nr_camere}` : null,
-    subiect.nr_etaje ? `Nr etaje: ${subiect.nr_etaje}` : null,
+    subiect.nr_etaje ? `Nr etaje: ${subiect.nr_etaje}${subiect.mansarda ? ' + mansarda' : ''}` : null,
+    subiect.mansarda && !subiect.nr_etaje ? 'Mansarda: da' : null,
     subiect.etaj ? `Etaj: ${subiect.etaj}` : null,
     subiect.an_constructie ? `An constructie: ${subiect.an_constructie}` : null,
     subiect.stare ? `Stare: ${subiect.stare}` : null,
@@ -66,18 +67,31 @@ Returneaza DOAR un JSON valid, fara text suplimentar:
 
 observatii_comparabile trebuie sa aiba exact ${comparabile.length} elemente.`
 
+  let rawText = ''
   try {
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 2048,
       messages: [{ role: 'user', content: prompt }],
     })
-    const text = message.content[0].type === 'text' ? message.content[0].text : ''
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) throw new Error('No JSON in response')
-    return NextResponse.json(JSON.parse(jsonMatch[0]))
+    rawText = message.content[0].type === 'text' ? message.content[0].text : ''
+    console.log('[acp] Claude raw response:', rawText.slice(0, 500))
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      console.error('[acp] No JSON found in response. Full text:', rawText)
+      throw new Error('No JSON in response')
+    }
+    const parsed = JSON.parse(jsonMatch[0])
+    // Validate required fields
+    const required = ['pret_recomandat_min', 'pret_recomandat_max', 'pret_recomandat', 'analiza', 'observatii_comparabile']
+    for (const field of required) {
+      if (!(field in parsed)) console.warn(`[acp] Missing field in response: ${field}`)
+    }
+    return NextResponse.json(parsed)
   } catch (error) {
-    console.error('ACP error:', error)
-    return NextResponse.json({ error: 'Analysis failed' }, { status: 500 })
+    const msg = error instanceof Error ? error.message : String(error)
+    console.error('[acp] Error:', msg)
+    if (rawText) console.error('[acp] Raw text at failure:', rawText.slice(0, 1000))
+    return NextResponse.json({ error: 'Analysis failed', detail: msg }, { status: 500 })
   }
 }

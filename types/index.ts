@@ -167,6 +167,7 @@ export interface ACPSubiect {
   // Casa/Vila
   suprafata_teren?: number
   nr_etaje?: number
+  mansarda?: boolean
   // Teren
   deschidere_strada?: number
   clasificare?: 'Intravilan' | 'Extravilan'

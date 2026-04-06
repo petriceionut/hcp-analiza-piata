@@ -336,6 +336,10 @@ export default function ACPClient() {
               <div>
                 <label className="label">Nr etaje</label>
                 <input type="number" value={subiect.nr_etaje || ''} onChange={e => updS('nr_etaje', e.target.value ? Number(e.target.value) : undefined)} className="input-field" placeholder="ex: 2" min={0} max={10} />
+                <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                  <input type="checkbox" checked={subiect.mansarda ?? false} onChange={e => updS('mansarda', e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500" />
+                  <span className="text-sm text-slate-700">Mansarda</span>
+                </label>
               </div>
               <div>
                 <label className="label">An constructie</label>
@@ -530,9 +534,9 @@ export default function ACPClient() {
                 <button
                   type="button"
                   onClick={addComp}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-slate-200 hover:border-purple-300 hover:bg-purple-50 text-slate-400 hover:text-purple-600 rounded-xl transition-colors text-sm font-medium"
+                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 hover:border-purple-300 text-purple-700 rounded-xl transition-colors text-sm font-semibold"
                 >
-                  <Plus className="w-4 h-4" /> Adauga comparabila {comparabile.length + 1}
+                  <Plus className="w-4 h-4 text-purple-600" /> Adauga comparabila {comparabile.length + 1}
                 </button>
               )}
             </div>
