@@ -1,133 +1,71 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
-import { ACPRequest, ACPResult } from '@/types'
+import type { ACPSubiect, ACPComparabila } from '@/types'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 export async function POST(request: Request) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { subiect, comparabile } = await request.json() as {
+    subiect: ACPSubiect
+    comparabile: ACPComparabila[]
   }
 
-  const body = await request.json()
+  const compRows = comparabile.map((c, i) => {
+    const pretMp = Math.round(c.pret_cerut / c.suprafata)
+    return `${i + 1}. ${c.adresa} — ${c.suprafata} mp${c.nr_camere ? `, ${c.nr_camere} cam` : ''}${c.etaj ? `, etaj ${c.etaj}` : ''}, ${c.stare}, ${c.pret_cerut.toLocaleString('ro-RO')} RON (${pretMp} RON/mp)`
+  }).join('\n')
 
-  let prompt: string
+  const subiectBlock = [
+    `Tip: ${subiect.tip}`,
+    `Adresa/Zona: ${subiect.adresa}`,
+    `Suprafata: ${subiect.suprafata} mp`,
+    subiect.nr_camere ? `Nr camere: ${subiect.nr_camere}` : null,
+    subiect.etaj ? `Etaj: ${subiect.etaj}` : null,
+    subiect.an_constructie ? `An constructie: ${subiect.an_constructie}` : null,
+    `Stare: ${subiect.stare}`,
+    subiect.pret_solicitat ? `Pret solicitat de client: ${subiect.pret_solicitat.toLocaleString('ro-RO')} RON` : null,
+  ].filter(Boolean).join('\n')
 
-  if (body.mode === 'text') {
-    prompt = buildTextPrompt(body.query)
-  } else {
-    prompt = buildFormPrompt(body.data as ACPRequest)
-  }
+  const prompt = `Esti un expert imobiliar din Romania. Un agent imobiliar ti-a furnizat urmatoarea proprietate subiect si comparabilele sale din piata.
+
+PROPRIETATEA SUBIECT:
+${subiectBlock}
+
+COMPARABILE INTRODUSE DE AGENT (${comparabile.length} proprietati):
+${compRows}
+
+Pe baza acestor date reale furnizate de agent, genereaza o analiza comparativa de piata (ACP) profesionala. Tine cont de diferentele intre proprietati (suprafata, etaj, stare, zona) pentru a ajusta valorile.
+
+Returneaza DOAR un JSON valid, fara text suplimentar, cu aceasta structura exacta:
+{
+  "pret_recomandat_min": <numar intreg RON>,
+  "pret_recomandat_max": <numar intreg RON>,
+  "pret_recomandat": <numar intreg RON, valoarea optima>,
+  "analiza": "<paragraf de 100-200 de cuvinte cu analiza pietei, justificarea pretului recomandat si tendinte>",
+  "observatii_comparabile": [<string pentru fiecare comparabila, scurt, ex: "Suprafata mai mica, stare similara, pret/mp mai mare cu 8%">]
+}
+
+Numarul de elemente din observatii_comparabile trebuie sa fie exact ${comparabile.length}.`
 
   try {
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
-      messages: [
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
+      max_tokens: 2048,
+      messages: [{ role: 'user', content: prompt }],
     })
 
-    const responseText = message.content[0].type === 'text' ? message.content[0].text : ''
-
-    // Extract JSON from response
-    const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/) ||
-                      responseText.match(/\{[\s\S]*\}/)
-
-    if (!jsonMatch) {
-      throw new Error('No JSON found in response')
-    }
-
-    const jsonStr = jsonMatch[1] || jsonMatch[0]
-    const result: ACPResult = JSON.parse(jsonStr)
-
+    const text = message.content[0].type === 'text' ? message.content[0].text : ''
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) throw new Error('No JSON in response')
+    const result = JSON.parse(jsonMatch[0])
     return NextResponse.json(result)
   } catch (error) {
-    console.error('ACP analysis error:', error)
+    console.error('ACP error:', error)
     return NextResponse.json({ error: 'Analysis failed' }, { status: 500 })
   }
-}
-
-function buildFormPrompt(data: ACPRequest): string {
-  return `Esti un expert imobiliar din Romania. Genereaza o analiza comparativa de piata (ACP) pentru urmatoarea proprietate:
-
-Tip: ${data.tip_proprietate}
-Judet: ${data.judet}
-Localitate/Zona: ${data.localitate}
-Suprafata: ${data.suprafata_mp} mp
-${data.nr_camere ? `Numar camere: ${data.nr_camere}` : ''}
-${data.an_constructie ? `An constructie: ${data.an_constructie}` : ''}
-${data.etaj ? `Etaj: ${data.etaj}` : ''}
-${data.observatii ? `Observatii: ${data.observatii}` : ''}
-
-Genereaza un JSON cu urmatoarea structura exacta:
-\`\`\`json
-{
-  "pret_minim": <numar EUR>,
-  "pret_maxim": <numar EUR>,
-  "pret_median": <numar EUR>,
-  "pret_mediu": <numar EUR>,
-  "pret_mp_mediu": <numar EUR/mp>,
-  "recomandare_pret": <numar EUR>,
-  "analiza_text": "<paragraf cu analiza detaliata a pietei, minim 150 cuvinte>",
-  "factori_pozitivi": ["<factor 1>", "<factor 2>", "<factor 3>", "<factor 4>"],
-  "factori_negativi": ["<factor 1>", "<factor 2>", "<factor 3>"],
-  "proprietati_comparabile": [
-    {
-      "adresa": "<strada si numar aproximativ>",
-      "pret": <numar EUR>,
-      "suprafata": <numar mp>,
-      "pret_mp": <numar EUR/mp>,
-      "nr_camere": <numar sau null>,
-      "an_constructie": <an sau null>,
-      "sursa": "imobiliare.ro",
-      "data_listare": "<luna an>"
-    }
-  ]
-}
-\`\`\`
-
-Bazeaza-te pe cunostintele tale despre piata imobiliara romaneasca. Proprietatile comparabile trebuie sa fie realiste pentru zona respectiva. Preturile trebuie sa reflecte piata actuala din Romania (2024-2025).`
-}
-
-function buildTextPrompt(query: string): string {
-  return `Esti un expert imobiliar din Romania. Un agent imobiliar iti cere o analiza comparativa de piata (ACP) pe baza urmatoarei descrieri:
-
-"${query}"
-
-Extrage informatiile relevante din descriere si genereaza un JSON cu urmatoarea structura exacta:
-\`\`\`json
-{
-  "pret_minim": <numar EUR>,
-  "pret_maxim": <numar EUR>,
-  "pret_median": <numar EUR>,
-  "pret_mediu": <numar EUR>,
-  "pret_mp_mediu": <numar EUR/mp>,
-  "recomandare_pret": <numar EUR>,
-  "analiza_text": "<paragraf cu analiza detaliata a pietei, minim 150 cuvinte>",
-  "factori_pozitivi": ["<factor 1>", "<factor 2>", "<factor 3>", "<factor 4>"],
-  "factori_negativi": ["<factor 1>", "<factor 2>", "<factor 3>"],
-  "proprietati_comparabile": [
-    {
-      "adresa": "<strada si numar aproximativ>",
-      "pret": <numar EUR>,
-      "suprafata": <numar mp>,
-      "pret_mp": <numar EUR/mp>,
-      "nr_camere": <numar sau null>,
-      "an_constructie": <an sau null>,
-      "sursa": "imobiliare.ro",
-      "data_listare": "<luna an>"
-    }
-  ]
-}
-\`\`\`
-
-Bazeaza-te pe cunostintele tale despre piata imobiliara romaneasca. Preturile trebuie sa reflecte piata actuala din Romania (2024-2025).`
 }

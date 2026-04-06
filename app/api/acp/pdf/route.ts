@@ -1,152 +1,111 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { ACPResult, ACPRequest } from '@/types'
+import type { ACPSubiect, ACPComparabila, ACPAnalysisResult } from '@/types'
 
 export async function POST(request: Request) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { subiect, comparabile, result } = await request.json() as {
+    subiect: ACPSubiect
+    comparabile: ACPComparabila[]
+    result: ACPAnalysisResult
   }
 
-  const { result, request: acpRequest, textQuery } = await request.json() as {
-    result: ACPResult
-    request?: ACPRequest
-    textQuery?: string
-  }
+  const fmt = (n: number) =>
+    new Intl.NumberFormat('ro-RO').format(n) + ' RON'
 
-  const html = generateReportHTML(result, acpRequest, textQuery)
+  const compRows = comparabile.map((c, i) => {
+    const pretMp = Math.round(c.pret_cerut / c.suprafata)
+    const obs = result.observatii_comparabile[i] ?? ''
+    return `<tr>
+      <td>${c.adresa}</td>
+      <td>${c.suprafata} mp</td>
+      <td>${c.nr_camere ?? '-'}</td>
+      <td>${c.etaj ?? '-'}</td>
+      <td>${c.stare}</td>
+      <td>${fmt(c.pret_cerut)}</td>
+      <td>${fmt(pretMp)}/mp</td>
+      <td style="font-size:12px;color:#64748b">${obs}</td>
+    </tr>`
+  }).join('')
 
-  return new Response(html, {
-    headers: {
-      'Content-Type': 'text/html; charset=utf-8',
-      'Content-Disposition': `attachment; filename="analiza-piata-${Date.now()}.html"`,
-    },
-  })
-}
+  const avgPretMp = Math.round(
+    comparabile.reduce((s, c) => s + c.pret_cerut / c.suprafata, 0) / comparabile.length
+  )
 
-function generateReportHTML(result: ACPResult, acpRequest?: ACPRequest, textQuery?: string): string {
-  const formatEUR = (n: number) =>
-    new Intl.NumberFormat('ro-RO', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0 }).format(n)
-
-  const propertyInfo = acpRequest
-    ? `
-      <table>
-        <tr><td><strong>Tip proprietate</strong></td><td>${acpRequest.tip_proprietate}</td></tr>
-        <tr><td><strong>Judet</strong></td><td>${acpRequest.judet}</td></tr>
-        <tr><td><strong>Localitate</strong></td><td>${acpRequest.localitate}</td></tr>
-        <tr><td><strong>Suprafata</strong></td><td>${acpRequest.suprafata_mp} mp</td></tr>
-        ${acpRequest.nr_camere ? `<tr><td><strong>Nr. camere</strong></td><td>${acpRequest.nr_camere}</td></tr>` : ''}
-        ${acpRequest.an_constructie ? `<tr><td><strong>An constructie</strong></td><td>${acpRequest.an_constructie}</td></tr>` : ''}
-        ${acpRequest.etaj ? `<tr><td><strong>Etaj</strong></td><td>${acpRequest.etaj}</td></tr>` : ''}
-        ${acpRequest.observatii ? `<tr><td><strong>Observatii</strong></td><td>${acpRequest.observatii}</td></tr>` : ''}
-      </table>`
-    : textQuery
-    ? `<p><em>"${textQuery}"</em></p>`
-    : ''
-
-  const comparabileRows = result.proprietati_comparabile
-    .map(
-      (p) => `
-        <tr>
-          <td>${p.adresa}</td>
-          <td>${p.suprafata} mp</td>
-          <td>${p.nr_camere ?? '-'}</td>
-          <td>${p.an_constructie ?? '-'}</td>
-          <td>${formatEUR(p.pret)}</td>
-          <td>${formatEUR(p.pret_mp)}/mp</td>
-          <td>${p.sursa}</td>
-        </tr>`
-    )
-    .join('')
-
-  return `<!DOCTYPE html>
+  const html = `<!DOCTYPE html>
 <html lang="ro">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Analiza Comparativa de Piata — HCP Imobiliare</title>
+  <title>ACP — ${subiect.adresa}</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 40px 20px; color: #1e293b; }
-    h1 { color: #7c3aed; border-bottom: 3px solid #7c3aed; padding-bottom: 10px; }
-    h2 { color: #334155; margin-top: 30px; }
-    .price-box { background: linear-gradient(135deg, #7c3aed, #5b21b6); color: white; padding: 30px; border-radius: 12px; margin: 20px 0; }
-    .price-box .main-price { font-size: 48px; font-weight: bold; margin: 10px 0; }
-    .price-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 20px; }
-    .price-item { background: rgba(255,255,255,0.15); padding: 15px; border-radius: 8px; text-align: center; }
-    .price-item .label { font-size: 12px; opacity: 0.8; }
-    .price-item .value { font-size: 20px; font-weight: bold; margin-top: 5px; }
-    table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-    th { background: #f1f5f9; padding: 10px; text-align: left; font-size: 13px; }
-    td { padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
-    tr:hover td { background: #f8fafc; }
-    .factors { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
-    .factor-box { padding: 20px; border-radius: 8px; }
-    .positive { background: #f0fdf4; border: 1px solid #bbf7d0; }
-    .negative { background: #fff7ed; border: 1px solid #fed7aa; }
-    .factor-box h3 { margin-top: 0; }
-    .factor-box ul { margin: 0; padding-left: 20px; }
-    .factor-box li { margin-bottom: 8px; font-size: 14px; }
-    .analiza { background: #f8fafc; padding: 20px; border-radius: 8px; line-height: 1.7; white-space: pre-line; }
-    .footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #94a3b8; font-size: 12px; }
-    @media print { body { padding: 20px; } }
+    body{font-family:Arial,sans-serif;max-width:960px;margin:0 auto;padding:40px 20px;color:#1e293b}
+    h1{color:#7c3aed;border-bottom:3px solid #7c3aed;padding-bottom:10px;margin-bottom:4px}
+    h2{color:#334155;margin-top:28px;margin-bottom:10px;font-size:16px}
+    .meta{color:#64748b;font-size:13px;margin-bottom:24px}
+    .subiect-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+    .s-item{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px}
+    .s-label{font-size:11px;color:#94a3b8;margin-bottom:3px}
+    .s-val{font-size:14px;font-weight:600;color:#1e293b}
+    .price-box{background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;border-radius:12px;padding:28px;margin:20px 0}
+    .main-price{font-size:40px;font-weight:700;margin:8px 0}
+    .range{font-size:15px;opacity:.85;margin-top:4px}
+    .avg-mp{margin-top:12px;font-size:14px;opacity:.8}
+    table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
+    th{background:#f1f5f9;padding:9px 10px;text-align:left;font-size:12px;color:#475569}
+    td{padding:9px 10px;border-bottom:1px solid #e2e8f0}
+    .analiza{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:18px;line-height:1.7;font-size:14px;white-space:pre-line}
+    .footer{margin-top:40px;padding-top:16px;border-top:1px solid #e2e8f0;text-align:center;color:#94a3b8;font-size:11px}
+    @media print{body{padding:20px}}
   </style>
 </head>
 <body>
   <h1>Analiza Comparativa de Piata</h1>
-  <p style="color:#64748b">Generat de HCP Imobiliare &bull; ${new Date().toLocaleDateString('ro-RO', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+  <p class="meta">HCP Imobiliare &bull; ${new Date().toLocaleDateString('ro-RO', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
 
-  ${propertyInfo ? `<h2>Proprietatea analizata</h2>${propertyInfo}` : ''}
+  <h2>Proprietatea subiect</h2>
+  <div class="subiect-grid">
+    <div class="s-item"><div class="s-label">Tip</div><div class="s-val">${subiect.tip}</div></div>
+    <div class="s-item"><div class="s-label">Adresa / Zona</div><div class="s-val">${subiect.adresa}</div></div>
+    <div class="s-item"><div class="s-label">Suprafata</div><div class="s-val">${subiect.suprafata} mp</div></div>
+    ${subiect.nr_camere ? `<div class="s-item"><div class="s-label">Nr camere</div><div class="s-val">${subiect.nr_camere}</div></div>` : ''}
+    ${subiect.etaj ? `<div class="s-item"><div class="s-label">Etaj</div><div class="s-val">${subiect.etaj}</div></div>` : ''}
+    ${subiect.an_constructie ? `<div class="s-item"><div class="s-label">An constructie</div><div class="s-val">${subiect.an_constructie}</div></div>` : ''}
+    <div class="s-item"><div class="s-label">Stare</div><div class="s-val">${subiect.stare}</div></div>
+    ${subiect.pret_solicitat ? `<div class="s-item"><div class="s-label">Pret solicitat client</div><div class="s-val">${fmt(subiect.pret_solicitat)}</div></div>` : ''}
+  </div>
 
   <div class="price-box">
-    <div style="font-size:14px;opacity:0.8">Pret recomandat</div>
-    <div class="main-price">${formatEUR(result.recomandare_pret)}</div>
-    <div style="font-size:14px;opacity:0.8">Pret mediu/mp: ${formatEUR(Math.round(result.pret_mp_mediu))}/mp</div>
-    <div class="price-grid">
-      <div class="price-item"><div class="label">Pret minim</div><div class="value">${formatEUR(result.pret_minim)}</div></div>
-      <div class="price-item"><div class="label">Pret median</div><div class="value">${formatEUR(result.pret_median)}</div></div>
-      <div class="price-item"><div class="label">Pret maxim</div><div class="value">${formatEUR(result.pret_maxim)}</div></div>
-    </div>
+    <div style="font-size:13px;opacity:.8">Pret recomandat</div>
+    <div class="main-price">${fmt(result.pret_recomandat)}</div>
+    <div class="range">Interval: ${fmt(result.pret_recomandat_min)} — ${fmt(result.pret_recomandat_max)}</div>
+    <div class="avg-mp">Pret mediu/mp comparabile: ${fmt(avgPretMp)}/mp</div>
   </div>
 
-  <h2>Analiza AI</h2>
-  <div class="analiza">${result.analiza_text}</div>
+  <h2>Analiza</h2>
+  <div class="analiza">${result.analiza}</div>
 
-  <div class="factors">
-    <div class="factor-box positive">
-      <h3 style="color:#16a34a">✓ Factori pozitivi</h3>
-      <ul>${result.factori_pozitivi.map((f) => `<li>${f}</li>`).join('')}</ul>
-    </div>
-    <div class="factor-box negative">
-      <h3 style="color:#ea580c">⚠ Factori negativi / riscuri</h3>
-      <ul>${result.factori_negativi.map((f) => `<li>${f}</li>`).join('')}</ul>
-    </div>
-  </div>
+  <h2>Comparabile (${comparabile.length})</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Adresa / Zona</th><th>Suprafata</th><th>Camere</th><th>Etaj</th>
+        <th>Stare</th><th>Pret cerut</th><th>Pret/mp</th><th>Observatii</th>
+      </tr>
+    </thead>
+    <tbody>${compRows}</tbody>
+  </table>
 
-  ${
-    result.proprietati_comparabile.length > 0
-      ? `<h2>Proprietati comparabile</h2>
-         <table>
-           <thead>
-             <tr>
-               <th>Adresa</th>
-               <th>Suprafata</th>
-               <th>Camere</th>
-               <th>An</th>
-               <th>Pret</th>
-               <th>Pret/mp</th>
-               <th>Sursa</th>
-             </tr>
-           </thead>
-           <tbody>${comparabileRows}</tbody>
-         </table>`
-      : ''
-  }
-
-  <div class="footer">
-    <p>Raport generat automat de platforma HCP Imobiliare &bull; Datele au caracter informativ</p>
-  </div>
+  <div class="footer">Raport generat de platforma HCP Imobiliare &bull; Date cu caracter informativ</div>
 </body>
 </html>`
+
+  return new Response(html, {
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Content-Disposition': `attachment; filename="ACP-${subiect.adresa.slice(0, 30).replace(/\s+/g, '-')}-${Date.now()}.html"`,
+    },
+  })
 }

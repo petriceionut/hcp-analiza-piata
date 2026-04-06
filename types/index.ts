@@ -149,37 +149,34 @@ export interface Agent {
   created_at: string
 }
 
-export interface ACPRequest {
-  tip_proprietate: PropertyType
-  judet: string
-  localitate: string
-  suprafata_mp: number
-  nr_camere?: number
-  an_constructie?: number
-  etaj?: string
-  observatii?: string
-}
+export type ACPStare = 'Renovata' | 'Stare buna' | 'Necesita renovare'
+export type ACPTip = 'Apartament' | 'Casa' | 'Teren' | 'Spatiu comercial'
 
-export interface ACPResult {
-  pret_minim: number
-  pret_maxim: number
-  pret_median: number
-  pret_mediu: number
-  pret_mp_mediu: number
-  proprietati_comparabile: ComparableProperty[]
-  analiza_text: string
-  recomandare_pret: number
-  factori_pozitivi: string[]
-  factori_negativi: string[]
-}
-
-export interface ComparableProperty {
+export interface ACPSubiect {
+  tip: ACPTip
   adresa: string
-  pret: number
   suprafata: number
-  pret_mp: number
   nr_camere?: number
+  etaj?: string
   an_constructie?: number
-  sursa: string
-  data_listare: string
+  stare: ACPStare
+  pret_solicitat?: number
+}
+
+export interface ACPComparabila {
+  adresa: string
+  suprafata: number
+  nr_camere?: number
+  etaj?: string
+  stare: ACPStare
+  pret_cerut: number
+  link_anunt?: string
+}
+
+export interface ACPAnalysisResult {
+  pret_recomandat_min: number
+  pret_recomandat_max: number
+  pret_recomandat: number
+  analiza: string
+  observatii_comparabile: string[]
 }
