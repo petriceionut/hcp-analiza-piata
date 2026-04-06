@@ -13,8 +13,25 @@ export async function POST(request: Request) {
     result: ACPAnalysisResult
   }
 
-  const fmt = (n: number) =>
-    new Intl.NumberFormat('ro-RO').format(n) + ' RON'
+  const fmt = (n: number) => '€' + new Intl.NumberFormat('ro-RO').format(n)
+
+  const subiectRows = [
+    ['Tip', subiect.tip],
+    ['Adresa / Zona', subiect.adresa],
+    subiect.tip === 'Casa/Vila'
+      ? ['Suprafata utila', `${subiect.suprafata} mp`]
+      : ['Suprafata', `${subiect.suprafata} mp`],
+    subiect.suprafata_teren ? ['Suprafata teren', `${subiect.suprafata_teren} mp`] : null,
+    subiect.nr_camere ? ['Nr camere', String(subiect.nr_camere)] : null,
+    subiect.nr_etaje ? ['Nr etaje', String(subiect.nr_etaje)] : null,
+    subiect.etaj ? ['Etaj', subiect.etaj] : null,
+    subiect.an_constructie ? ['An constructie', String(subiect.an_constructie)] : null,
+    subiect.stare ? ['Stare', subiect.stare] : null,
+    subiect.deschidere_strada ? ['Deschidere la strada', `${subiect.deschidere_strada} m`] : null,
+    subiect.clasificare ? ['Clasificare', subiect.clasificare] : null,
+    subiect.utilitati?.length ? ['Utilitati', subiect.utilitati.join(', ')] : null,
+    subiect.pret_solicitat ? ['Pret solicitat client', fmt(subiect.pret_solicitat)] : null,
+  ].filter(Boolean) as [string, string][]
 
   const compRows = comparabile.map((c, i) => {
     const pretMp = Math.round(c.pret_cerut / c.suprafata)
@@ -24,7 +41,7 @@ export async function POST(request: Request) {
       <td>${c.suprafata} mp</td>
       <td>${c.nr_camere ?? '-'}</td>
       <td>${c.etaj ?? '-'}</td>
-      <td>${c.stare}</td>
+      <td>${c.stare ?? '-'}</td>
       <td>${fmt(c.pret_cerut)}</td>
       <td>${fmt(pretMp)}/mp</td>
       <td style="font-size:12px;color:#64748b">${obs}</td>
@@ -45,14 +62,12 @@ export async function POST(request: Request) {
     h1{color:#7c3aed;border-bottom:3px solid #7c3aed;padding-bottom:10px;margin-bottom:4px}
     h2{color:#334155;margin-top:28px;margin-bottom:10px;font-size:16px}
     .meta{color:#64748b;font-size:13px;margin-bottom:24px}
-    .subiect-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+    .subiect-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
     .s-item{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px}
     .s-label{font-size:11px;color:#94a3b8;margin-bottom:3px}
     .s-val{font-size:14px;font-weight:600;color:#1e293b}
     .price-box{background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;border-radius:12px;padding:28px;margin:20px 0}
     .main-price{font-size:40px;font-weight:700;margin:8px 0}
-    .range{font-size:15px;opacity:.85;margin-top:4px}
-    .avg-mp{margin-top:12px;font-size:14px;opacity:.8}
     table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
     th{background:#f1f5f9;padding:9px 10px;text-align:left;font-size:12px;color:#475569}
     td{padding:9px 10px;border-bottom:1px solid #e2e8f0}
@@ -67,21 +82,14 @@ export async function POST(request: Request) {
 
   <h2>Proprietatea subiect</h2>
   <div class="subiect-grid">
-    <div class="s-item"><div class="s-label">Tip</div><div class="s-val">${subiect.tip}</div></div>
-    <div class="s-item"><div class="s-label">Adresa / Zona</div><div class="s-val">${subiect.adresa}</div></div>
-    <div class="s-item"><div class="s-label">Suprafata</div><div class="s-val">${subiect.suprafata} mp</div></div>
-    ${subiect.nr_camere ? `<div class="s-item"><div class="s-label">Nr camere</div><div class="s-val">${subiect.nr_camere}</div></div>` : ''}
-    ${subiect.etaj ? `<div class="s-item"><div class="s-label">Etaj</div><div class="s-val">${subiect.etaj}</div></div>` : ''}
-    ${subiect.an_constructie ? `<div class="s-item"><div class="s-label">An constructie</div><div class="s-val">${subiect.an_constructie}</div></div>` : ''}
-    <div class="s-item"><div class="s-label">Stare</div><div class="s-val">${subiect.stare}</div></div>
-    ${subiect.pret_solicitat ? `<div class="s-item"><div class="s-label">Pret solicitat client</div><div class="s-val">${fmt(subiect.pret_solicitat)}</div></div>` : ''}
+    ${subiectRows.map(([l, v]) => `<div class="s-item"><div class="s-label">${l}</div><div class="s-val">${v}</div></div>`).join('')}
   </div>
 
   <div class="price-box">
     <div style="font-size:13px;opacity:.8">Pret recomandat</div>
     <div class="main-price">${fmt(result.pret_recomandat)}</div>
-    <div class="range">Interval: ${fmt(result.pret_recomandat_min)} — ${fmt(result.pret_recomandat_max)}</div>
-    <div class="avg-mp">Pret mediu/mp comparabile: ${fmt(avgPretMp)}/mp</div>
+    <div style="font-size:15px;opacity:.85;margin-top:4px">Interval: ${fmt(result.pret_recomandat_min)} — ${fmt(result.pret_recomandat_max)}</div>
+    <div style="margin-top:12px;font-size:14px;opacity:.8">Pret mediu/mp comparabile: ${fmt(avgPretMp)}/mp</div>
   </div>
 
   <h2>Analiza</h2>
@@ -92,7 +100,7 @@ export async function POST(request: Request) {
     <thead>
       <tr>
         <th>Adresa / Zona</th><th>Suprafata</th><th>Camere</th><th>Etaj</th>
-        <th>Stare</th><th>Pret cerut</th><th>Pret/mp</th><th>Observatii</th>
+        <th>Stare</th><th>Pret cerut</th><th>€/mp</th><th>Observatii</th>
       </tr>
     </thead>
     <tbody>${compRows}</tbody>

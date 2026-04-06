@@ -150,17 +150,28 @@ export interface Agent {
 }
 
 export type ACPStare = 'Renovata' | 'Stare buna' | 'Necesita renovare'
-export type ACPTip = 'Apartament' | 'Casa' | 'Teren' | 'Spatiu comercial'
+export type ACPTip = 'Apartament' | 'Casa/Vila' | 'Teren' | 'Spatiu Comercial'
 
 export interface ACPSubiect {
   tip: ACPTip
   adresa: string
+  // common
   suprafata: number
-  nr_camere?: number
-  etaj?: string
   an_constructie?: number
-  stare: ACPStare
-  pret_solicitat?: number
+  stare?: ACPStare
+  pret_solicitat?: number        // EUR
+  // Apartament + Spatiu Comercial
+  etaj?: string
+  // Apartament + Casa/Vila
+  nr_camere?: number
+  // Casa/Vila
+  suprafata_teren?: number
+  nr_etaje?: number
+  // Teren
+  deschidere_strada?: number
+  clasificare?: 'Intravilan' | 'Extravilan'
+  // Casa/Vila + Teren
+  utilitati?: string[]
 }
 
 export interface ACPComparabila {
@@ -168,8 +179,8 @@ export interface ACPComparabila {
   suprafata: number
   nr_camere?: number
   etaj?: string
-  stare: ACPStare
-  pret_cerut: number
+  stare?: ACPStare
+  pret_cerut: number             // EUR
   link_anunt?: string
 }
 

@@ -17,40 +17,54 @@ export async function POST(request: Request) {
 
   const compRows = comparabile.map((c, i) => {
     const pretMp = Math.round(c.pret_cerut / c.suprafata)
-    return `${i + 1}. ${c.adresa} — ${c.suprafata} mp${c.nr_camere ? `, ${c.nr_camere} cam` : ''}${c.etaj ? `, etaj ${c.etaj}` : ''}, ${c.stare}, ${c.pret_cerut.toLocaleString('ro-RO')} RON (${pretMp} RON/mp)`
+    const parts = [
+      `${i + 1}. ${c.adresa}`,
+      `${c.suprafata} mp`,
+      c.nr_camere ? `${c.nr_camere} cam` : null,
+      c.etaj ? `etaj ${c.etaj}` : null,
+      c.stare ?? null,
+      `€${c.pret_cerut.toLocaleString('ro-RO')} (€${pretMp}/mp)`,
+    ].filter(Boolean)
+    return parts.join(' — ')
   }).join('\n')
 
-  const subiectBlock = [
+  const subiectLines = [
     `Tip: ${subiect.tip}`,
     `Adresa/Zona: ${subiect.adresa}`,
-    `Suprafata: ${subiect.suprafata} mp`,
+    subiect.tip === 'Casa/Vila'
+      ? `Suprafata utila: ${subiect.suprafata} mp${subiect.suprafata_teren ? `, teren: ${subiect.suprafata_teren} mp` : ''}`
+      : `Suprafata: ${subiect.suprafata} mp`,
     subiect.nr_camere ? `Nr camere: ${subiect.nr_camere}` : null,
+    subiect.nr_etaje ? `Nr etaje: ${subiect.nr_etaje}` : null,
     subiect.etaj ? `Etaj: ${subiect.etaj}` : null,
     subiect.an_constructie ? `An constructie: ${subiect.an_constructie}` : null,
-    `Stare: ${subiect.stare}`,
-    subiect.pret_solicitat ? `Pret solicitat de client: ${subiect.pret_solicitat.toLocaleString('ro-RO')} RON` : null,
+    subiect.stare ? `Stare: ${subiect.stare}` : null,
+    subiect.deschidere_strada ? `Deschidere la strada: ${subiect.deschidere_strada} m` : null,
+    subiect.clasificare ? `Clasificare: ${subiect.clasificare}` : null,
+    subiect.utilitati?.length ? `Utilitati: ${subiect.utilitati.join(', ')}` : null,
+    subiect.pret_solicitat ? `Pret solicitat client: €${subiect.pret_solicitat.toLocaleString('ro-RO')}` : null,
   ].filter(Boolean).join('\n')
 
-  const prompt = `Esti un expert imobiliar din Romania. Un agent imobiliar ti-a furnizat urmatoarea proprietate subiect si comparabilele sale din piata.
+  const prompt = `Esti un expert imobiliar din Romania. Un agent imobiliar ti-a furnizat o proprietate subiect si comparabilele din piata. Toate preturile sunt in EUR (Euro).
 
 PROPRIETATEA SUBIECT:
-${subiectBlock}
+${subiectLines}
 
-COMPARABILE INTRODUSE DE AGENT (${comparabile.length} proprietati):
+COMPARABILE INTRODUSE DE AGENT (${comparabile.length}):
 ${compRows}
 
-Pe baza acestor date reale furnizate de agent, genereaza o analiza comparativa de piata (ACP) profesionala. Tine cont de diferentele intre proprietati (suprafata, etaj, stare, zona) pentru a ajusta valorile.
+Analizeaza datele si genereaza o analiza comparativa de piata profesionala. Tine cont de diferentele intre proprietati (suprafata, etaj, stare, zona, utilitati) pentru a ajusta valorile si a recomanda un interval de pret realist in EUR pentru proprietatea subiect.
 
-Returneaza DOAR un JSON valid, fara text suplimentar, cu aceasta structura exacta:
+Returneaza DOAR un JSON valid, fara text suplimentar:
 {
-  "pret_recomandat_min": <numar intreg RON>,
-  "pret_recomandat_max": <numar intreg RON>,
-  "pret_recomandat": <numar intreg RON, valoarea optima>,
-  "analiza": "<paragraf de 100-200 de cuvinte cu analiza pietei, justificarea pretului recomandat si tendinte>",
-  "observatii_comparabile": [<string pentru fiecare comparabila, scurt, ex: "Suprafata mai mica, stare similara, pret/mp mai mare cu 8%">]
+  "pret_recomandat_min": <numar intreg EUR>,
+  "pret_recomandat_max": <numar intreg EUR>,
+  "pret_recomandat": <numar intreg EUR, valoarea optima>,
+  "analiza": "<paragraf 100-200 cuvinte cu analiza pietei, justificarea pretului si tendinte>",
+  "observatii_comparabile": [<string scurt pentru fiecare comparabila, ex: "Suprafata mai mica cu 5%, stare similara, pret/mp cu 8% mai mare">]
 }
 
-Numarul de elemente din observatii_comparabile trebuie sa fie exact ${comparabile.length}.`
+observatii_comparabile trebuie sa aiba exact ${comparabile.length} elemente.`
 
   try {
     const message = await anthropic.messages.create({
@@ -58,12 +72,10 @@ Numarul de elemente din observatii_comparabile trebuie sa fie exact ${comparabil
       max_tokens: 2048,
       messages: [{ role: 'user', content: prompt }],
     })
-
     const text = message.content[0].type === 'text' ? message.content[0].text : ''
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     if (!jsonMatch) throw new Error('No JSON in response')
-    const result = JSON.parse(jsonMatch[0])
-    return NextResponse.json(result)
+    return NextResponse.json(JSON.parse(jsonMatch[0]))
   } catch (error) {
     console.error('ACP error:', error)
     return NextResponse.json({ error: 'Analysis failed' }, { status: 500 })
