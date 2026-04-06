@@ -174,6 +174,7 @@ const showStare    = (tip: ACPTip) => tip !== 'Teren'
 export default function ACPClient() {
   const [step, setStep] = useState<1 | 2>(1)
   const [loading, setLoading] = useState(false)
+  const [pdfLoading, setPdfLoading] = useState(false)
   const [result, setResult] = useState<ACPAnalysisResult | null>(null)
   const [subiect, setSubiect] = useState<ACPSubiect>(defaultSubiect())
   const [comparabile, setComparabile] = useState<ACPComparabila[]>([emptyComp()])
@@ -274,14 +275,45 @@ export default function ACPClient() {
     setComparabile([emptyComp()]); setExpanded([true])
   }
 
-  const exportPdf = () => {
-    if (!result) return
-    const filled = comparabile.filter((c, i) =>
-      i === 0 || (c.judet && c.localitate.trim() && c.suprafata > 0 && c.pret_cerut > 0)
-    )
-    const key = `acp-pdf-${Date.now()}`
-    localStorage.setItem(key, JSON.stringify({ subiect, comparabile: filled, result }))
-    window.open(`/acp/pdf-preview?key=${key}`, '_blank')
+  const exportPdf = async () => {
+    if (!result || pdfLoading) return
+    const el = document.getElementById('acp-report-content')
+    if (!el) { toast.error('Continutul raportului nu a fost gasit'); return }
+    setPdfLoading(true)
+    try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ])
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+      })
+      const imgData = canvas.toDataURL('image/png')
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      const pageW = pdf.internal.pageSize.getWidth()
+      const pageH = pdf.internal.pageSize.getHeight()
+      const imgW = pageW
+      const imgH = (canvas.height * imgW) / canvas.width
+      let yOffset = 0
+      let remaining = imgH
+      while (remaining > 0) {
+        pdf.addImage(imgData, 'PNG', 0, -yOffset, imgW, imgH)
+        remaining -= pageH
+        if (remaining > 0) {
+          pdf.addPage()
+          yOffset += pageH
+        }
+      }
+      pdf.save(`ACP-${subiect.localitate || subiect.judet || 'raport'}.pdf`)
+    } catch (err) {
+      console.error('PDF error:', err)
+      toast.error('Eroare la generarea PDF')
+    } finally {
+      setPdfLoading(false)
+    }
   }
 
   // ── RESULT VIEW ─────────────────────────────────────────────────────────────
@@ -297,15 +329,25 @@ export default function ACPClient() {
 
     return (
       <div className="max-w-4xl space-y-6">
-        {/* Action bar */}
+        {/* Action bar — excluded from PDF capture */}
         <div className="flex items-center justify-between">
           <button onClick={reset} className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700">
             <ArrowLeft className="w-4 h-4" /> Analiza noua
           </button>
-          <button onClick={exportPdf} className="flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium hover:opacity-90" style={{ backgroundColor: NAVY }}>
-            <Download className="w-4 h-4" /> Export PDF
+          <button
+            onClick={exportPdf}
+            disabled={pdfLoading}
+            className="flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-60"
+            style={{ backgroundColor: NAVY }}
+          >
+            {pdfLoading
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Se genereaza...</>
+              : <><Download className="w-4 h-4" /> Export PDF</>}
           </button>
         </div>
+
+        {/* Report content captured by html2canvas */}
+        <div id="acp-report-content" className="space-y-6 bg-white p-1 rounded-2xl">
 
         {/* Professional report header */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -452,6 +494,7 @@ export default function ACPClient() {
             </table>
           </div>
         </div>
+        </div> {/* end #acp-report-content */}
       </div>
     )
   }
