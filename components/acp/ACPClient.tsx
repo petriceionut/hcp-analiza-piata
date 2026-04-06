@@ -274,28 +274,14 @@ export default function ACPClient() {
     setComparabile([emptyComp()]); setExpanded([true])
   }
 
-  const exportPdf = async () => {
+  const exportPdf = () => {
     if (!result) return
     const filled = comparabile.filter((c, i) =>
       i === 0 || (c.judet && c.localitate.trim() && c.suprafata > 0 && c.pret_cerut > 0)
     )
-    try {
-      const res = await fetch('/api/acp/pdf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subiect, comparabile: filled, result }),
-      })
-      if (!res.ok) throw new Error()
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `ACP-${subiect.localitate || subiect.judet}.pdf`
-      a.click()
-      URL.revokeObjectURL(url)
-    } catch {
-      toast.error('Eroare la generarea PDF')
-    }
+    const key = `acp-pdf-${Date.now()}`
+    localStorage.setItem(key, JSON.stringify({ subiect, comparabile: filled, result }))
+    window.open(`/acp/pdf-preview?key=${key}`, '_blank')
   }
 
   // ── RESULT VIEW ─────────────────────────────────────────────────────────────
