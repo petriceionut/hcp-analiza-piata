@@ -14,13 +14,32 @@ export interface NewsArticle {
 }
 
 const FEEDS: { url: string; source: string }[] = [
-  { url: 'https://www.imobiliare.ro/stiri/rss', source: 'Imobiliare.ro' },
-  { url: 'https://www.proprietati.ro/stiri/rss', source: 'Proprietati.ro' },
-  { url: 'https://www.spatiicomerciale.ro/stiri/rss', source: 'SpatiiComerciale.ro' },
-  { url: 'https://www.newimobiliare.ro/feed', source: 'NewImobiliare.ro' },
-  { url: 'https://www.imobiliare365.ro/feed', source: 'Imobiliare365.ro' },
-  { url: 'https://www.ziare.com/imobiliare/rss', source: 'Ziare.com' },
+  { url: 'https://www.profit.ro/rss/imobiliare.rss', source: 'Profit.ro' },
+  { url: 'https://www.economica.net/rss/imobiliare', source: 'Economica.net' },
+  { url: 'https://www.capital.ro/rss/imobiliare', source: 'Capital.ro' },
+  { url: 'https://www.wall-street.ro/rss/imobiliare.xml', source: 'Wall-Street.ro' },
+  { url: 'https://www.ziare.com/imobiliare/stiri/rss', source: 'Ziare.com' },
+  { url: 'https://www.agerpres.ro/rss/economie/imobiliare', source: 'Agerpres' },
 ]
+
+const INCLUDE_KEYWORDS = [
+  'imobiliar', 'apartament', 'casa', 'teren', 'proprietate',
+  'ipoteca', 'credit imobiliar', 'chirie', 'dezvoltator',
+  'constructii', 'anl', 'bnr dobanda', 'tva imobiliare',
+  'cadastru', 'locuinta', 'rezidential',
+]
+
+const EXCLUDE_KEYWORDS = [
+  'nato', 'militar', 'razboi', 'conflict', 'rusia', 'ucraina', 'trump',
+  'alegeri', 'partid', 'parlament', 'meteo', 'vreme', 'sport', 'fotbal',
+  'monden', 'sanatate', 'medical',
+]
+
+function matchesFilters(title: string, desc: string): boolean {
+  const combined = (title + ' ' + desc).toLowerCase()
+  if (EXCLUDE_KEYWORDS.some(kw => combined.includes(kw))) return false
+  return INCLUDE_KEYWORDS.some(kw => combined.includes(kw))
+}
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -112,6 +131,7 @@ async function fetchFeed(feed: { url: string; source: string }): Promise<NewsArt
       const timestamp = pubDateStr ? new Date(pubDateStr).getTime() : 0
 
       if (!title || !link) continue
+      if (!matchesFilters(title, description)) continue
 
       articles.push({
         title: title.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>'),
