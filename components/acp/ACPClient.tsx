@@ -24,6 +24,116 @@ function fmtEUR(n: number) {
   return '€' + new Intl.NumberFormat('ro-RO').format(n)
 }
 
+const NAVY = '#0f2557'
+
+// Horizontal bar chart: subject vs comparables by €/mp
+function BarChart({ subiect, comps }: { subiect: { label: string; pretMp: number }; comps: { label: string; pretMp: number }[] }) {
+  const all = [subiect, ...comps]
+  const max = Math.max(...all.map(x => x.pretMp)) * 1.15
+  return (
+    <div className="space-y-2.5">
+      {all.map((item, i) => {
+        const isSubiect = i === 0
+        const pct = Math.round((item.pretMp / max) * 100)
+        return (
+          <div key={i} className="flex items-center gap-3">
+            <div className="w-32 text-xs text-slate-600 text-right truncate shrink-0">{item.label}</div>
+            <div className="flex-1 bg-slate-100 rounded-full h-6 overflow-hidden">
+              <div
+                className="h-full rounded-full flex items-center justify-end pr-2 transition-all duration-500"
+                style={{ width: `${pct}%`, backgroundColor: isSubiect ? NAVY : '#93c5fd' }}
+              >
+                <span className={`text-xs font-semibold ${isSubiect ? 'text-white' : 'text-blue-900'}`}>
+                  {fmtEUR(item.pretMp)}
+                </span>
+              </div>
+            </div>
+          </div>
+        )
+      })}
+      <div className="flex gap-4 mt-1 pl-36">
+        <span className="flex items-center gap-1.5 text-xs text-slate-500">
+          <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: NAVY }} /> Proprietatea subiect
+        </span>
+        <span className="flex items-center gap-1.5 text-xs text-slate-500">
+          <span className="w-3 h-3 rounded-sm inline-block bg-blue-300" /> Comparabile
+        </span>
+      </div>
+    </div>
+  )
+}
+
+// Price gauge: shows min-max range with markers for recommended and client price
+function PriceGauge({ min, max, rec, clientPrice }: { min: number; max: number; rec: number; clientPrice?: number }) {
+  const range = max - min
+  const padding = range * 0.2
+  const lo = min - padding
+  const hi = max + padding
+  const span = hi - lo
+  const toPct = (v: number) => Math.max(0, Math.min(100, ((v - lo) / span) * 100))
+
+  const recPct = toPct(rec)
+  const minPct = toPct(min)
+  const maxPct = toPct(max)
+  const clientPct = clientPrice != null ? toPct(clientPrice) : null
+
+  return (
+    <div className="pt-6 pb-2">
+      {/* Track */}
+      <div className="relative h-4 bg-slate-100 rounded-full">
+        {/* Recommended range band */}
+        <div
+          className="absolute top-0 h-full rounded-full opacity-30"
+          style={{ left: `${minPct}%`, width: `${maxPct - minPct}%`, backgroundColor: NAVY }}
+        />
+        {/* Min marker */}
+        <div className="absolute top-0 h-full w-0.5 bg-slate-400" style={{ left: `${minPct}%` }} />
+        {/* Max marker */}
+        <div className="absolute top-0 h-full w-0.5 bg-slate-400" style={{ left: `${maxPct}%` }} />
+        {/* Recommended dot */}
+        <div
+          className="absolute top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-2 border-white shadow-md -ml-2.5 z-10"
+          style={{ left: `${recPct}%`, backgroundColor: NAVY }}
+        />
+        {/* Client price dot */}
+        {clientPct != null && (
+          <div
+            className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-white shadow-md -ml-2 z-10 bg-amber-500"
+            style={{ left: `${clientPct}%` }}
+          />
+        )}
+      </div>
+      {/* Labels below */}
+      <div className="relative mt-3 h-8 text-xs text-slate-500">
+        <span className="absolute -translate-x-1/2" style={{ left: `${minPct}%` }}>{fmtEUR(min)}</span>
+        <span className="absolute -translate-x-1/2" style={{ left: `${maxPct}%` }}>{fmtEUR(max)}</span>
+        <span
+          className="absolute -translate-x-1/2 font-bold"
+          style={{ left: `${recPct}%`, color: NAVY }}
+        >{fmtEUR(rec)}</span>
+        {clientPct != null && clientPrice != null && (
+          <span className="absolute -translate-x-1/2 text-amber-600 font-semibold" style={{ left: `${clientPct}%`, top: '16px' }}>
+            {fmtEUR(clientPrice)}
+          </span>
+        )}
+      </div>
+      <div className="flex gap-4 mt-2">
+        <span className="flex items-center gap-1.5 text-xs text-slate-500">
+          <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: NAVY }} /> Pret recomandat
+        </span>
+        {clientPrice != null && (
+          <span className="flex items-center gap-1.5 text-xs text-slate-500">
+            <span className="w-3 h-3 rounded-full inline-block bg-amber-500" /> Pret solicitat client
+          </span>
+        )}
+        <span className="flex items-center gap-1.5 text-xs text-slate-500">
+          <span className="w-3 h-3 rounded-sm inline-block opacity-40" style={{ backgroundColor: NAVY }} /> Interval recomandat
+        </span>
+      </div>
+    </div>
+  )
+}
+
 const emptyComp = (): ACPComparabila => ({
   adresa: '', suprafata: 0, nr_camere: undefined, etaj: '',
   stare: 'Stare buna', pret_cerut: 0, link_anunt: '',
@@ -157,21 +267,53 @@ export default function ACPClient() {
     const avgPretMp = Math.round(
       filledComps.reduce((s, c) => s + c.pret_cerut / c.suprafata, 0) / filledComps.length
     )
+    const subiectPretMp = subiect.suprafata > 0 ? Math.round(result.pret_recomandat / subiect.suprafata) : 0
+    const dateRo = new Date().toLocaleDateString('ro-RO', { day: '2-digit', month: 'long', year: 'numeric' })
+
     return (
       <div className="max-w-4xl space-y-6">
+        {/* Action bar */}
         <div className="flex items-center justify-between">
           <button onClick={reset} className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700">
             <ArrowLeft className="w-4 h-4" /> Analiza noua
           </button>
-          <button onClick={downloadPdf} className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium">
+          <button onClick={downloadPdf} className="flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium hover:opacity-90" style={{ backgroundColor: NAVY }}>
             <Download className="w-4 h-4" /> Export PDF
           </button>
         </div>
 
-        <div className="bg-gradient-to-r from-purple-600 to-purple-800 rounded-2xl p-6 text-white">
-          <p className="text-purple-200 text-sm mb-1">Pret recomandat</p>
+        {/* Professional report header */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 flex items-center justify-between">
+            {/* Logo left */}
+            <div className="flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo-hcp.png" alt="HCP" height={52} style={{ height: 52, width: 'auto' }}
+                onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+              <div className="leading-tight">
+                <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: NAVY }}>Home Capital Partners</p>
+                <p className="text-xs text-slate-400">Servicii Imobiliare</p>
+              </div>
+            </div>
+            {/* Title center */}
+            <div className="text-center">
+              <p className="text-sm font-bold uppercase tracking-wider" style={{ color: NAVY }}>Analiza Comparativa de Piata</p>
+              <p className="text-xs text-slate-400 mt-0.5">{subiect.tip} · {subiect.adresa}</p>
+            </div>
+            {/* Date right */}
+            <div className="text-right">
+              <p className="text-xs text-slate-400">Data raportului</p>
+              <p className="text-sm font-semibold text-slate-700">{dateRo}</p>
+            </div>
+          </div>
+          <div className="h-0.5" style={{ backgroundColor: NAVY }} />
+        </div>
+
+        {/* Summary box — navy */}
+        <div className="rounded-2xl p-6 text-white" style={{ backgroundColor: NAVY }}>
+          <p className="text-blue-200 text-sm mb-1">Pret recomandat</p>
           <p className="text-4xl font-bold">{fmtEUR(result.pret_recomandat)}</p>
-          <p className="text-purple-200 mt-2 text-sm">
+          <p className="text-blue-200 mt-2 text-sm">
             Interval: {fmtEUR(result.pret_recomandat_min)} — {fmtEUR(result.pret_recomandat_max)}
           </p>
           {subiect.pret_solicitat && (
@@ -185,14 +327,42 @@ export default function ACPClient() {
                 : 'in intervalul recomandat ✓'}
             </p>
           )}
-          <p className="mt-3 text-purple-300 text-xs">Pret mediu/mp comparabile: {fmtEUR(avgPretMp)}/mp</p>
+          <p className="mt-3 text-blue-300 text-xs">Pret mediu/mp comparabile: {fmtEUR(avgPretMp)}/mp</p>
         </div>
 
+        {/* Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Bar chart */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5">
+            <h3 className="font-semibold text-slate-900 mb-4 text-sm">Comparatie €/mp</h3>
+            <BarChart
+              subiect={{ label: subiect.adresa.split(',')[0] || 'Subiect', pretMp: subiectPretMp }}
+              comps={filledComps.map(c => ({
+                label: c.adresa.split(',')[0] || `Comp`,
+                pretMp: Math.round(c.pret_cerut / c.suprafata),
+              }))}
+            />
+          </div>
+          {/* Gauge */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5">
+            <h3 className="font-semibold text-slate-900 mb-1 text-sm">Pozitionare pret</h3>
+            <p className="text-xs text-slate-400 mb-2">Interval recomandat vs pret solicitat</p>
+            <PriceGauge
+              min={result.pret_recomandat_min}
+              max={result.pret_recomandat_max}
+              rec={result.pret_recomandat}
+              clientPrice={subiect.pret_solicitat}
+            />
+          </div>
+        </div>
+
+        {/* Analysis */}
         <div className="bg-white rounded-2xl border border-gray-100 p-6">
           <h3 className="font-semibold text-slate-900 mb-3">Analiza</h3>
           <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{result.analiza}</p>
         </div>
 
+        {/* Comparables table */}
         <div className="bg-white rounded-2xl border border-gray-100 p-6">
           <h3 className="font-semibold text-slate-900 mb-4">Comparabile ({filledComps.length})</h3>
           <div className="overflow-x-auto">
@@ -252,7 +422,7 @@ export default function ACPClient() {
         {[1, 2].map(s => (
           <div key={s} className="flex items-center gap-2">
             <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
-              step === s ? 'bg-purple-600 text-white' : step > s ? 'bg-green-500 text-white' : 'bg-slate-200 text-slate-500'
+              step === s ? 'bg-blue-900 text-white' : step > s ? 'bg-green-500 text-white' : 'bg-slate-200 text-slate-500'
             }`}>{s}</div>
             <span className={`text-sm font-medium ${step === s ? 'text-slate-900' : 'text-slate-400'}`}>
               {s === 1 ? 'Proprietatea subiect' : 'Comparabile'}
@@ -276,7 +446,7 @@ export default function ACPClient() {
                 onClick={() => setTip(tip)}
                 className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
                   subiect.tip === tip
-                    ? 'border-purple-600 bg-purple-50 text-purple-700'
+                    ? 'border-blue-900 bg-blue-50 text-blue-900'
                     : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'
                 }`}
               >
@@ -337,7 +507,7 @@ export default function ACPClient() {
                 <label className="label">Nr etaje</label>
                 <input type="number" value={subiect.nr_etaje || ''} onChange={e => updS('nr_etaje', e.target.value ? Number(e.target.value) : undefined)} className="input-field" placeholder="ex: 2" min={0} max={10} />
                 <label className="flex items-center gap-2 mt-2 cursor-pointer">
-                  <input type="checkbox" checked={subiect.mansarda ?? false} onChange={e => updS('mansarda', e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500" />
+                  <input type="checkbox" checked={subiect.mansarda ?? false} onChange={e => updS('mansarda', e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-blue-900 focus:ring-blue-800" />
                   <span className="text-sm text-slate-700">Mansarda</span>
                 </label>
               </div>
@@ -356,7 +526,7 @@ export default function ACPClient() {
                 <div className="flex flex-wrap gap-3 mt-1">
                   {UTILITATI_CASA.map(u => (
                     <label key={u} className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={(subiect.utilitati ?? []).includes(u)} onChange={() => toggleUtilitate(u)} className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500" />
+                      <input type="checkbox" checked={(subiect.utilitati ?? []).includes(u)} onChange={() => toggleUtilitate(u)} className="w-4 h-4 rounded border-slate-300 text-blue-900 focus:ring-blue-800" />
                       <span className="text-sm text-slate-700">{u}</span>
                     </label>
                   ))}
@@ -387,7 +557,7 @@ export default function ACPClient() {
                 <div className="flex flex-wrap gap-3 mt-1">
                   {UTILITATI_TEREN.map(u => (
                     <label key={u} className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={(subiect.utilitati ?? []).includes(u)} onChange={() => toggleUtilitate(u)} className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500" />
+                      <input type="checkbox" checked={(subiect.utilitati ?? []).includes(u)} onChange={() => toggleUtilitate(u)} className="w-4 h-4 rounded border-slate-300 text-blue-900 focus:ring-blue-800" />
                       <span className="text-sm text-slate-700">{u}</span>
                     </label>
                   ))}
@@ -425,7 +595,7 @@ export default function ACPClient() {
           </div>
 
           <div className="mt-6 flex justify-end">
-            <button onClick={() => { if (validateStep1()) setStep(2) }} className="flex items-center gap-2 px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold">
+            <button onClick={() => { if (validateStep1()) setStep(2) }} className="flex items-center gap-2 px-6 py-2.5 bg-blue-900 hover:bg-blue-800 text-white rounded-xl font-semibold">
               Continuă <ArrowRight className="w-4 h-4" />
             </button>
           </div>
@@ -456,7 +626,7 @@ export default function ACPClient() {
                       className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
                     >
                       <div className="flex items-center gap-3">
-                        <span className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 text-xs font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
+                        <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-900 text-xs font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
                         <span className="text-sm font-semibold text-slate-700">
                           {c.adresa.trim() || `Comparabila ${i + 1}`}
                         </span>
@@ -534,9 +704,9 @@ export default function ACPClient() {
                 <button
                   type="button"
                   onClick={addComp}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 hover:border-purple-300 text-purple-700 rounded-xl transition-colors text-sm font-semibold"
+                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 hover:border-blue-300 text-blue-900 rounded-xl transition-colors text-sm font-semibold"
                 >
-                  <Plus className="w-4 h-4 text-purple-600" /> Adauga comparabila {comparabile.length + 1}
+                  <Plus className="w-4 h-4 text-blue-900" /> Adauga comparabila {comparabile.length + 1}
                 </button>
               )}
             </div>
@@ -549,7 +719,7 @@ export default function ACPClient() {
             <button
               onClick={generate}
               disabled={loading}
-              className="flex items-center gap-2 px-6 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 text-white rounded-xl font-semibold"
+              className="flex items-center gap-2 px-6 py-2.5 bg-blue-900 hover:bg-blue-800 disabled:bg-blue-300 text-white rounded-xl font-semibold"
             >
               {loading
                 ? <><Loader2 className="w-5 h-5 animate-spin" /> Se genereaza...</>

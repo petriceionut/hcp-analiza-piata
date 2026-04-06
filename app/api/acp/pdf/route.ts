@@ -60,14 +60,25 @@ export async function POST(request: Request) {
   <title>ACP — ${subiect.adresa}</title>
   <style>
     body{font-family:Arial,sans-serif;max-width:960px;margin:0 auto;padding:40px 20px;color:#1e293b}
-    h1{color:#7c3aed;border-bottom:3px solid #7c3aed;padding-bottom:10px;margin-bottom:4px}
+    h1{color:#0f2557;border-bottom:3px solid #0f2557;padding-bottom:10px;margin-bottom:4px}
     h2{color:#334155;margin-top:28px;margin-bottom:10px;font-size:16px}
     .meta{color:#64748b;font-size:13px;margin-bottom:24px}
     .subiect-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
     .s-item{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px}
     .s-label{font-size:11px;color:#94a3b8;margin-bottom:3px}
     .s-val{font-size:14px;font-weight:600;color:#1e293b}
-    .price-box{background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;border-radius:12px;padding:28px;margin:20px 0}
+    .report-header{display:flex;align-items:center;justify-content:space-between;padding-bottom:14px;margin-bottom:24px;border-bottom:3px solid #0f2557}
+    .report-header .logo-wrap{display:flex;align-items:center;gap:10px}
+    .report-header .logo-wrap img{height:52px;width:auto}
+    .report-header .logo-text .name{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#0f2557}
+    .report-header .logo-text .sub{font-size:11px;color:#94a3b8}
+    .report-header .title-center{text-align:center}
+    .report-header .title-center .main{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#0f2557}
+    .report-header .title-center .sub{font-size:11px;color:#64748b;margin-top:2px}
+    .report-header .date-right{text-align:right}
+    .report-header .date-right .label{font-size:11px;color:#94a3b8}
+    .report-header .date-right .val{font-size:13px;font-weight:600;color:#1e293b}
+    .price-box{background:#0f2557;color:#fff;border-radius:12px;padding:28px;margin:20px 0}
     .main-price{font-size:40px;font-weight:700;margin:8px 0}
     table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
     th{background:#f1f5f9;padding:9px 10px;text-align:left;font-size:12px;color:#475569}
@@ -78,8 +89,23 @@ export async function POST(request: Request) {
   </style>
 </head>
 <body>
-  <h1>Analiza Comparativa de Piata</h1>
-  <p class="meta">HCP Imobiliare &bull; ${new Date().toLocaleDateString('ro-RO', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+  <div class="report-header">
+    <div class="logo-wrap">
+      <img src="/logo-hcp.png" alt="HCP" onerror="this.style.display='none'">
+      <div class="logo-text">
+        <div class="name">Home Capital Partners</div>
+        <div class="sub">Servicii Imobiliare</div>
+      </div>
+    </div>
+    <div class="title-center">
+      <div class="main">Analiza Comparativa de Piata</div>
+      <div class="sub">${subiect.tip} &bull; ${subiect.adresa}</div>
+    </div>
+    <div class="date-right">
+      <div class="label">Data raportului</div>
+      <div class="val">${new Date().toLocaleDateString('ro-RO', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
+    </div>
+  </div>
 
   <h2>Proprietatea subiect</h2>
   <div class="subiect-grid">
