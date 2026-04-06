@@ -15,43 +15,14 @@ export interface NewsArticle {
 
 const FEEDS: { url: string; source: string }[] = [
   { url: 'https://www.imobiliare.ro/stiri/rss', source: 'Imobiliare.ro' },
-  { url: 'https://www.profit.ro/rss/imobiliare', source: 'Profit.ro' },
-  { url: 'https://www.zf.ro/rss/imobiliare', source: 'Ziarul Financiar' },
-  { url: 'https://www.forbes.ro/feed', source: 'Forbes România' },
-  { url: 'https://www.economica.net/feed', source: 'Economica.net' },
-  { url: 'https://www.digi24.ro/rss', source: 'Digi24' },
-  { url: 'https://stirileprotv.ro/rss', source: 'ProTV Știri' },
-  { url: 'https://www.realitatea.net/rss', source: 'Realitatea.net' },
-  { url: 'https://www.g4media.ro/feed', source: 'G4Media' },
-  { url: 'https://www.hotnews.ro/rss', source: 'HotNews' },
-  { url: 'https://www.capital.ro/feed', source: 'Capital.ro' },
-  { url: 'https://www.wall-street.ro/rss', source: 'Wall-Street.ro' },
-  { url: 'https://www.businessmagazin.ro/feed', source: 'Business Magazin' },
-  { url: 'https://www.ziare.com/imobiliare/rss', source: 'Ziare.com' },
-  { url: 'https://www.curs-valutar.ro/rss', source: 'Curs-Valutar.ro' },
-]
-
-const KEYWORDS = [
-  'imobiliar',
-  'apartament',
-  'casă', 'casa ',
-  'teren',
-  'proprietate',
-  'ipotecă', 'ipoteca',
-  'credit imobiliar',
-  'dobândă', 'dobanda',
-  ' anl ',
-  'anre',
-  'construcții rezidențiale', 'constructii rezidentiale',
-  'autorizație de construire', 'autorizatie de construire',
-  'piața imobiliară', 'piata imobiliara',
-  'chirie', 'chirii',
-  'dezvoltator imobiliar',
-  'proiect rezidențial', 'proiect rezidential',
-  'bnr dobândă', 'bnr dobanda',
-  'tva imobiliar',
-  'cadastru',
-  'intabulare',
+  { url: 'https://www.ziarul.ro/rss/imobiliare.xml', source: 'Ziarul.ro' },
+  { url: 'https://www.economica.net/rss/imobiliare', source: 'Economica.net' },
+  { url: 'https://www.profit.ro/rss/imobiliare.rss', source: 'Profit.ro' },
+  { url: 'https://www.capital.ro/rss/imobiliare', source: 'Capital.ro' },
+  { url: 'https://www.wall-street.ro/rss/imobiliare', source: 'Wall-Street.ro' },
+  { url: 'https://www.avocatnet.ro/rss/imobiliare', source: 'Avocatnet.ro' },
+  { url: 'https://www.bankingnews.ro/rss.xml', source: 'BankingNews.ro' },
+  { url: 'https://www.curs-valutar.com/rss', source: 'Curs-Valutar.com' },
 ]
 
 const parser = new XMLParser({
@@ -108,17 +79,9 @@ const EXCLUDE_KEYWORDS = [
   'premier', 'presedinte', 'președinte', 'coalitie', 'coaliție',
 ]
 
-function matchesKeywords(title: string, desc: string): boolean {
-  const titleLow = title.toLowerCase()
-  const descLow = desc.toLowerCase()
-
-  // Exclude first — if title OR description contains an exclusion term, reject
-  const combined = titleLow + ' ' + descLow
-  if (EXCLUDE_KEYWORDS.some(kw => combined.includes(kw))) return false
-
-  // Require a match in BOTH title checked first, then description as fallback
-  return KEYWORDS.some(kw => titleLow.includes(kw)) ||
-    KEYWORDS.some(kw => descLow.includes(kw))
+function isNotExcluded(title: string, desc: string): boolean {
+  const combined = (title + ' ' + desc).toLowerCase()
+  return !EXCLUDE_KEYWORDS.some(kw => combined.includes(kw))
 }
 
 async function fetchFeed(feed: { url: string; source: string }): Promise<NewsArticle[]> {
@@ -163,7 +126,7 @@ async function fetchFeed(feed: { url: string; source: string }): Promise<NewsArt
       const timestamp = pubDateStr ? new Date(pubDateStr).getTime() : 0
 
       if (!title || !link) continue
-      if (!matchesKeywords(title, description)) continue
+      if (!isNotExcluded(title, description)) continue
 
       articles.push({
         title: title.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>'),
