@@ -10,6 +10,25 @@ import toast from 'react-hot-toast'
 
 const STARI: ACPStare[] = ['Renovata', 'Stare buna', 'Necesita renovare']
 
+const JUDETE = [
+  'Alba','Arad','Arges','Bacau','Bihor','Bistrita-Nasaud','Botosani','Brasov',
+  'Braila','Buzau','Caras-Severin','Calarasi','Cluj','Constanta','Covasna',
+  'Dambovita','Dolj','Galati','Giurgiu','Gorj','Harghita','Hunedoara','Ialomita',
+  'Iasi','Ilfov','Maramures','Mehedinti','Mures','Neamt','Olt','Prahova',
+  'Satu Mare','Salaj','Sibiu','Suceava','Teleorman','Timis','Tulcea','Vaslui',
+  'Valcea','Vrancea','Bucuresti',
+]
+
+const SECTOARE = ['Sector 1','Sector 2','Sector 3','Sector 4','Sector 5','Sector 6']
+
+function locatie(obj: { judet?: string; localitate?: string; adresa_stradala?: string }) {
+  return [obj.adresa_stradala, obj.localitate, obj.judet].filter(Boolean).join(', ')
+}
+
+function locatieScurta(obj: { localitate?: string; judet?: string }) {
+  return obj.localitate || obj.judet || '—'
+}
+
 const TIP_CARDS: { tip: ACPTip; icon: React.ElementType; label: string }[] = [
   { tip: 'Apartament',     icon: Building2, label: 'Apartament' },
   { tip: 'Casa/Vila',      icon: Home,      label: 'Casa / Vila' },
@@ -41,9 +60,9 @@ function BarChart({ subiect, comps }: { subiect: { label: string; pretMp: number
             <div className="flex-1 bg-slate-100 rounded-full h-6 overflow-hidden">
               <div
                 className="h-full rounded-full flex items-center justify-end pr-2 transition-all duration-500"
-                style={{ width: `${pct}%`, backgroundColor: isSubiect ? NAVY : '#93c5fd' }}
+                style={{ width: `${pct}%`, backgroundColor: isSubiect ? NAVY : '#4a90d9' }}
               >
-                <span className={`text-xs font-semibold ${isSubiect ? 'text-white' : 'text-blue-900'}`}>
+                <span className={`text-xs font-semibold ${isSubiect ? 'text-white' : 'text-white'}`}>
                   {fmtEUR(item.pretMp)}
                 </span>
               </div>
@@ -56,7 +75,7 @@ function BarChart({ subiect, comps }: { subiect: { label: string; pretMp: number
           <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: NAVY }} /> Proprietatea subiect
         </span>
         <span className="flex items-center gap-1.5 text-xs text-slate-500">
-          <span className="w-3 h-3 rounded-sm inline-block bg-blue-300" /> Comparabile
+          <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: '#4a90d9' }} /> Comparabile
         </span>
       </div>
     </div>
@@ -135,12 +154,14 @@ function PriceGauge({ min, max, rec, clientPrice }: { min: number; max: number; 
 }
 
 const emptyComp = (): ACPComparabila => ({
-  adresa: '', suprafata: 0, nr_camere: undefined, etaj: '',
+  judet: '', localitate: '', adresa_stradala: '',
+  suprafata: 0, nr_camere: undefined, etaj: '',
   stare: 'Stare buna', pret_cerut: 0, link_anunt: '',
 })
 
 const defaultSubiect = (): ACPSubiect => ({
-  tip: 'Apartament', adresa: '', suprafata: 0, stare: 'Stare buna',
+  tip: 'Apartament', judet: '', localitate: '', adresa_stradala: '',
+  suprafata: 0, stare: 'Stare buna',
 })
 
 // Which fields to show per type
@@ -187,22 +208,24 @@ export default function ACPClient() {
     setExpanded(p => p.map((v, idx) => idx === i ? !v : v))
 
   const validateStep1 = () => {
-    if (!subiect.adresa.trim()) { toast.error('Completati adresa proprietatii subiect'); return false }
+    if (!subiect.judet) { toast.error('Selectati judetul'); return false }
+    if (!subiect.localitate.trim()) { toast.error('Completati localitatea'); return false }
     if (!subiect.suprafata || subiect.suprafata <= 0) { toast.error('Completati suprafata'); return false }
     return true
   }
 
   const validateStep2 = () => {
     const c = comparabile[0]
-    if (!c.adresa.trim()) { toast.error('Comparabila 1: completati adresa'); return false }
+    if (!c.judet) { toast.error('Comparabila 1: selectati judetul'); return false }
+    if (!c.localitate.trim()) { toast.error('Comparabila 1: completati localitatea'); return false }
     if (!c.suprafata || c.suprafata <= 0) { toast.error('Comparabila 1: completati suprafata'); return false }
     if (!c.pret_cerut || c.pret_cerut <= 0) { toast.error('Comparabila 1: completati pretul'); return false }
-    // validate any additional comp that has partial data
     for (let i = 1; i < comparabile.length; i++) {
       const c2 = comparabile[i]
-      const hasAny = c2.adresa || c2.suprafata || c2.pret_cerut
+      const hasAny = c2.judet || c2.localitate || c2.suprafata || c2.pret_cerut
       if (hasAny) {
-        if (!c2.adresa.trim()) { toast.error(`Comparabila ${i + 1}: completati adresa`); return false }
+        if (!c2.judet) { toast.error(`Comparabila ${i + 1}: selectati judetul`); return false }
+        if (!c2.localitate.trim()) { toast.error(`Comparabila ${i + 1}: completati localitatea`); return false }
         if (!c2.suprafata || c2.suprafata <= 0) { toast.error(`Comparabila ${i + 1}: completati suprafata`); return false }
         if (!c2.pret_cerut || c2.pret_cerut <= 0) { toast.error(`Comparabila ${i + 1}: completati pretul`); return false }
       }
@@ -214,7 +237,7 @@ export default function ACPClient() {
     if (!validateStep2()) return
     // Only send filled comparabile
     const filled = comparabile.filter((c, i) =>
-      i === 0 || (c.adresa.trim() && c.suprafata > 0 && c.pret_cerut > 0)
+      i === 0 || (c.judet && c.localitate.trim() && c.suprafata > 0 && c.pret_cerut > 0)
     )
     setLoading(true)
     try {
@@ -235,7 +258,7 @@ export default function ACPClient() {
 
   const downloadPdf = async () => {
     const filled = comparabile.filter((c, i) =>
-      i === 0 || (c.adresa.trim() && c.suprafata > 0 && c.pret_cerut > 0)
+      i === 0 || (c.judet && c.localitate.trim() && c.suprafata > 0 && c.pret_cerut > 0)
     )
     try {
       const res = await fetch('/api/acp/pdf', {
@@ -247,7 +270,7 @@ export default function ACPClient() {
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
-      a.href = url; a.download = `ACP-${subiect.adresa.slice(0, 20)}.html`; a.click()
+      a.href = url; a.download = `ACP-${subiect.localitate || subiect.judet}.html`; a.click()
     } catch {
       toast.error('Eroare la export')
     }
@@ -262,7 +285,7 @@ export default function ACPClient() {
   // ── RESULT VIEW ─────────────────────────────────────────────────────────────
   if (result) {
     const filledComps = comparabile.filter((c, i) =>
-      i === 0 || (c.adresa.trim() && c.suprafata > 0 && c.pret_cerut > 0)
+      i === 0 || (c.judet && c.localitate.trim() && c.suprafata > 0 && c.pret_cerut > 0)
     )
     const avgPretMp = Math.round(
       filledComps.reduce((s, c) => s + c.pret_cerut / c.suprafata, 0) / filledComps.length
@@ -286,19 +309,14 @@ export default function ACPClient() {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-6 py-4 flex items-center justify-between">
             {/* Logo left */}
-            <div className="flex items-center gap-3">
+            <div className="flex-shrink-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo-hcp.png" alt="HCP" height={52} style={{ height: 52, width: 'auto' }}
-                onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
-              <div className="leading-tight">
-                <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: NAVY }}>Home Capital Partners</p>
-                <p className="text-xs text-slate-400">Servicii Imobiliare</p>
-              </div>
+              <img src="/logo-hcp.png" alt="Home Capital Partners" style={{ height: 50, width: 'auto' }} />
             </div>
             {/* Title center */}
             <div className="text-center">
               <p className="text-sm font-bold uppercase tracking-wider" style={{ color: NAVY }}>Analiza Comparativa de Piata</p>
-              <p className="text-xs text-slate-400 mt-0.5">{subiect.tip} · {subiect.adresa}</p>
+              <p className="text-xs text-slate-400 mt-0.5">{subiect.tip} · {locatie(subiect)}</p>
             </div>
             {/* Date right */}
             <div className="text-right">
@@ -336,9 +354,9 @@ export default function ACPClient() {
           <div className="bg-white rounded-2xl border border-gray-100 p-5">
             <h3 className="font-semibold text-slate-900 mb-4 text-sm">Comparatie €/mp</h3>
             <BarChart
-              subiect={{ label: subiect.adresa.split(',')[0] || 'Subiect', pretMp: subiectPretMp }}
+              subiect={{ label: locatieScurta(subiect) || 'Subiect', pretMp: subiectPretMp }}
               comps={filledComps.map(c => ({
-                label: c.adresa.split(',')[0] || `Comp`,
+                label: locatieScurta(c),
                 pretMp: Math.round(c.pret_cerut / c.suprafata),
               }))}
             />
@@ -386,8 +404,8 @@ export default function ACPClient() {
                     <td className="py-3 pr-3 text-slate-400 font-medium">{i + 1}</td>
                     <td className="py-3 pr-3 font-medium text-slate-800">
                       {c.link_anunt
-                        ? <a href={c.link_anunt} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{c.adresa}</a>
-                        : c.adresa}
+                        ? <a href={c.link_anunt} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{locatie(c)}</a>
+                        : locatie(c)}
                     </td>
                     <td className="py-3 pr-3 text-slate-600">{c.suprafata} mp</td>
                     {showNrCamere(subiect.tip) && <td className="py-3 pr-3 text-slate-600">{c.nr_camere ?? '—'}</td>}
@@ -457,10 +475,28 @@ export default function ACPClient() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* Address — always */}
-            <div className="sm:col-span-2 lg:col-span-3">
-              <label className="label">Adresa / Zona *</label>
-              <input value={subiect.adresa} onChange={e => updS('adresa', e.target.value)} className="input-field" placeholder="ex: Floreasca, Sector 2, Bucuresti" />
+            {/* Location — always */}
+            <div>
+              <label className="label">Judet *</label>
+              <select value={subiect.judet} onChange={e => updS('judet', e.target.value)} className="input-field">
+                <option value="">— Selectati judetul —</option>
+                {JUDETE.map(j => <option key={j} value={j}>{j}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">Localitate *</label>
+              {subiect.judet === 'Bucuresti' ? (
+                <select value={subiect.localitate} onChange={e => updS('localitate', e.target.value)} className="input-field">
+                  <option value="">— Sector —</option>
+                  {SECTOARE.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              ) : (
+                <input value={subiect.localitate} onChange={e => updS('localitate', e.target.value)} className="input-field" placeholder="ex: Cluj-Napoca, Floresti" />
+              )}
+            </div>
+            <div>
+              <label className="label">Adresa <span className="text-slate-400 font-normal">— optional</span></label>
+              <input value={subiect.adresa_stradala || ''} onChange={e => updS('adresa_stradala', e.target.value)} className="input-field" placeholder="ex: Str. Unirii 10" />
             </div>
 
             {/* APARTAMENT fields */}
@@ -612,7 +648,7 @@ export default function ACPClient() {
             <div className="space-y-2">
               {comparabile.map((c, i) => {
                 const isOpen = expanded[i]
-                const hasData = c.adresa.trim() || c.suprafata > 0 || c.pret_cerut > 0
+                const hasData = c.judet || c.localitate.trim() || c.suprafata > 0 || c.pret_cerut > 0
                 const pretMp = c.suprafata > 0 && c.pret_cerut > 0
                   ? fmtEUR(Math.round(c.pret_cerut / c.suprafata)) + '/mp'
                   : null
@@ -628,7 +664,7 @@ export default function ACPClient() {
                       <div className="flex items-center gap-3">
                         <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-900 text-xs font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
                         <span className="text-sm font-semibold text-slate-700">
-                          {c.adresa.trim() || `Comparabila ${i + 1}`}
+                          {c.localitate.trim() ? locatie(c) : `Comparabila ${i + 1}`}
                         </span>
                         {pretMp && !isOpen && (
                           <span className="text-xs text-slate-400 font-normal">{fmtEUR(c.pret_cerut)} · {pretMp}</span>
@@ -652,9 +688,27 @@ export default function ACPClient() {
                     {/* Accordion body */}
                     {isOpen && (
                       <div className="p-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        <div className="col-span-2">
-                          <label className="label">Adresa / Zona {i === 0 ? '*' : ''}</label>
-                          <input value={c.adresa} onChange={e => updC(i, 'adresa', e.target.value)} className="input-field" placeholder="ex: Floreasca, Sector 2" />
+                        <div>
+                          <label className="label">Judet {i === 0 ? '*' : ''}</label>
+                          <select value={c.judet} onChange={e => updC(i, 'judet', e.target.value)} className="input-field">
+                            <option value="">— Judet —</option>
+                            {JUDETE.map(j => <option key={j} value={j}>{j}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="label">Localitate {i === 0 ? '*' : ''}</label>
+                          {c.judet === 'Bucuresti' ? (
+                            <select value={c.localitate} onChange={e => updC(i, 'localitate', e.target.value)} className="input-field">
+                              <option value="">— Sector —</option>
+                              {SECTOARE.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                          ) : (
+                            <input value={c.localitate} onChange={e => updC(i, 'localitate', e.target.value)} className="input-field" placeholder="ex: Cluj-Napoca" />
+                          )}
+                        </div>
+                        <div>
+                          <label className="label">Adresa <span className="text-slate-400 font-normal">— opt.</span></label>
+                          <input value={c.adresa_stradala || ''} onChange={e => updC(i, 'adresa_stradala', e.target.value)} className="input-field" placeholder="ex: Str. Unirii 10" />
                         </div>
                         <div>
                           <label className="label">Suprafata (mp) {i === 0 ? '*' : ''}</label>

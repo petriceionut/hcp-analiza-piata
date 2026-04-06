@@ -15,9 +15,14 @@ export async function POST(request: Request) {
 
   const fmt = (n: number) => '€' + new Intl.NumberFormat('ro-RO').format(n)
 
+  const locatie = (o: { judet?: string; localitate?: string; adresa_stradala?: string }) =>
+    [o.adresa_stradala, o.localitate, o.judet].filter(Boolean).join(', ')
+
   const subiectRows = [
     ['Tip', subiect.tip],
-    ['Adresa / Zona', subiect.adresa],
+    ['Judet', subiect.judet],
+    ['Localitate', subiect.localitate],
+    subiect.adresa_stradala ? ['Adresa', subiect.adresa_stradala] : null,
     subiect.tip === 'Casa/Vila'
       ? ['Suprafata utila', `${subiect.suprafata} mp`]
       : ['Suprafata', `${subiect.suprafata} mp`],
@@ -38,7 +43,7 @@ export async function POST(request: Request) {
     const pretMp = Math.round(c.pret_cerut / c.suprafata)
     const obs = result.observatii_comparabile[i] ?? ''
     return `<tr>
-      <td>${c.adresa}</td>
+      <td>${locatie(c)}</td>
       <td>${c.suprafata} mp</td>
       <td>${c.nr_camere ?? '-'}</td>
       <td>${c.etaj ?? '-'}</td>
@@ -57,7 +62,7 @@ export async function POST(request: Request) {
 <html lang="ro">
 <head>
   <meta charset="UTF-8">
-  <title>ACP — ${subiect.adresa}</title>
+  <title>ACP — ${subiect.localitate}, ${subiect.judet}</title>
   <style>
     body{font-family:Arial,sans-serif;max-width:960px;margin:0 auto;padding:40px 20px;color:#1e293b}
     h1{color:#0f2557;border-bottom:3px solid #0f2557;padding-bottom:10px;margin-bottom:4px}
@@ -99,7 +104,7 @@ export async function POST(request: Request) {
     </div>
     <div class="title-center">
       <div class="main">Analiza Comparativa de Piata</div>
-      <div class="sub">${subiect.tip} &bull; ${subiect.adresa}</div>
+      <div class="sub">${subiect.tip} &bull; ${locatie(subiect)}</div>
     </div>
     <div class="date-right">
       <div class="label">Data raportului</div>
@@ -140,7 +145,7 @@ export async function POST(request: Request) {
   return new Response(html, {
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
-      'Content-Disposition': `attachment; filename="ACP-${subiect.adresa.slice(0, 30).replace(/\s+/g, '-')}-${Date.now()}.html"`,
+      'Content-Disposition': `attachment; filename="ACP-${(subiect.localitate || subiect.judet).replace(/\s+/g, '-')}-${Date.now()}.html"`,
     },
   })
 }

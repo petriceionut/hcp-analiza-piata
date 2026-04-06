@@ -154,7 +154,9 @@ export type ACPTip = 'Apartament' | 'Casa/Vila' | 'Teren' | 'Spatiu Comercial'
 
 export interface ACPSubiect {
   tip: ACPTip
-  adresa: string
+  judet: string
+  localitate: string
+  adresa_stradala?: string
   // common
   suprafata: number
   an_constructie?: number
@@ -176,7 +178,9 @@ export interface ACPSubiect {
 }
 
 export interface ACPComparabila {
-  adresa: string
+  judet: string
+  localitate: string
+  adresa_stradala?: string
   suprafata: number
   nr_camere?: number
   etaj?: string

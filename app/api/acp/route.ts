@@ -15,10 +15,13 @@ export async function POST(request: Request) {
     comparabile: ACPComparabila[]
   }
 
+  const locatie = (o: { judet?: string; localitate?: string; adresa_stradala?: string }) =>
+    [o.adresa_stradala, o.localitate, o.judet].filter(Boolean).join(', ')
+
   const compRows = comparabile.map((c, i) => {
     const pretMp = Math.round(c.pret_cerut / c.suprafata)
     const parts = [
-      `${i + 1}. ${c.adresa}`,
+      `${i + 1}. ${locatie(c)}`,
       `${c.suprafata} mp`,
       c.nr_camere ? `${c.nr_camere} cam` : null,
       c.etaj ? `etaj ${c.etaj}` : null,
@@ -30,7 +33,9 @@ export async function POST(request: Request) {
 
   const subiectLines = [
     `Tip: ${subiect.tip}`,
-    `Adresa/Zona: ${subiect.adresa}`,
+    `Judet: ${subiect.judet}`,
+    `Localitate: ${subiect.localitate}`,
+    subiect.adresa_stradala ? `Adresa: ${subiect.adresa_stradala}` : null,
     subiect.tip === 'Casa/Vila'
       ? `Suprafata utila: ${subiect.suprafata} mp${subiect.suprafata_teren ? `, teren: ${subiect.suprafata_teren} mp` : ''}`
       : `Suprafata: ${subiect.suprafata} mp`,
